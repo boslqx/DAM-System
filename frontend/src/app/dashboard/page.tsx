@@ -13,8 +13,18 @@ import {
   Flex,
   Button,
   useToast,
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalCloseButton,
+  useDisclosure,
 } from "@chakra-ui/react";
 import { useDropzone } from "react-dropzone";
+import { Worker, Viewer } from "@react-pdf-viewer/core";
+import "@react-pdf-viewer/core/lib/styles/index.css";
+import "@react-pdf-viewer/default-layout/lib/styles/index.css";
 
 type Asset = {
   id: number;
@@ -28,7 +38,10 @@ export default function Dashboard() {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
+
   const toast = useToast();
+  const { isOpen, onOpen, onClose } = useDisclosure();
 
   // Fetch assets from Django API
   useEffect(() => {
@@ -52,8 +65,8 @@ export default function Dashboard() {
     formData.append("file", file);
 
     const ext = file.name.split(".").pop()?.toLowerCase();
-
     let detectedType = "other";
+
     if (["jpg", "jpeg", "png", "gif"].includes(ext!)) detectedType = "image";
     else if (["mp4", "mov", "avi"].includes(ext!)) detectedType = "video";
     else if (["pdf", "docx", "pptx", "xlsx"].includes(ext!)) detectedType = "document";
@@ -78,10 +91,13 @@ export default function Dashboard() {
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
-    accept: {
-    "*/*": []},
-    multiple: true,
+    accept: { "*/*": [] },
   });
+
+  const handlePreview = (asset: Asset) => {
+    setSelectedAsset(asset);
+    onOpen();
+  };
 
   if (loading) {
     return (
@@ -123,7 +139,7 @@ export default function Dashboard() {
               Drag & Drop or Click to Upload
             </Text>
             <Text fontSize="sm" color="gray.600">
-              Supported: Any file type (images, videos, PDFs, documents, 3D models, etc.)   
+              Supported: Any file type (images, videos, PDFs, documents, 3D models, etc.)
             </Text>
           </>
         )}
@@ -140,77 +156,54 @@ export default function Dashboard() {
             boxShadow="sm"
             _hover={{ boxShadow: "md", transform: "translateY(-4px)" }}
             transition="0.2s ease"
+            onClick={() => handlePreview(asset)}
+            cursor="pointer"
           >
             <VStack align="start" spacing={3}>
+              {/* ✅ Thumbnails */}
               {asset.type === "image" && (
                 <Image
-                    src={asset.file}
-                    alt={asset.name}
-                    borderRadius="md"
-                    w="100%"
-                    h="150px"
-                    objectFit="cover"
+                  src={asset.file}
+                  alt={asset.name}
+                  borderRadius="md"
+                  w="100%"
+                  h="150px"
+                  objectFit="cover"
                 />
-                )}
-
-                {asset.type === "video" && (
-                <video width="100%" height="150" controls>
-                    <source src={asset.file} />
+              )}
+              {asset.type === "video" && (
+                <video width="100%" height="150">
+                  <source src={asset.file} />
                 </video>
-                )}
-
-                {asset.type === "document" && (
+              )}
+              {asset.type === "document" && (
                 <Box
-                    w="100%"
-                    h="150px"
-                    bg="gray.100"
-                    borderRadius="md"
-                    display="flex"
-                    alignItems="center"
-                    justifyContent="center"
-                    flexDirection="column"
+                  w="100%"
+                  h="150px"
+                  bg="gray.100"
+                  borderRadius="md"
+                  display="flex"
+                  alignItems="center"
+                  justifyContent="center"
                 >
-                    <Text fontWeight="bold" color="brand.200">
+                  <Text fontWeight="bold" color="brand.200">
                     📄 {asset.name}
-                    </Text>
-                    <Button
-                    as="a"
-                    href={asset.file}
-                    download
-                    size="sm"
-                    mt={2}
-                    colorScheme="blue"
-                    >
-                    Download
-                    </Button>
+                  </Text>
                 </Box>
-                )}
-
-                {asset.type === "other" && (
+              )}
+              {asset.type === "other" && (
                 <Box
-                    w="100%"
-                    h="150px"
-                    bg="gray.50"
-                    borderRadius="md"
-                    display="flex"
-                    alignItems="center"
-                    justifyContent="center"
-                    flexDirection="column"
+                  w="100%"
+                  h="150px"
+                  bg="gray.50"
+                  borderRadius="md"
+                  display="flex"
+                  alignItems="center"
+                  justifyContent="center"
                 >
-                    <Text color="gray.600">🗂️ {asset.name}</Text>
-                    <Button
-                    as="a"
-                    href={asset.file}
-                    download
-                    size="sm"
-                    mt={2}
-                    colorScheme="blue"
-                    >
-                    Download
-                    </Button>
+                  <Text color="gray.600">🗂️ {asset.name}</Text>
                 </Box>
-                )}
-
+              )}
               <Text fontWeight="bold">{asset.name}</Text>
               <Text fontSize="sm" color="gray.600">
                 {asset.description || "No description"}
@@ -219,6 +212,51 @@ export default function Dashboard() {
           </GridItem>
         ))}
       </Grid>
+
+      {/* 🔹 Preview Modal */}
+      <Modal isOpen={isOpen} onClose={onClose} size="4xl" isCentered>
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader>{selectedAsset?.name}</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody pb={6} display="flex" justifyContent="center" alignItems="center">
+            {selectedAsset?.type === "image" && (
+              <Image
+                src={selectedAsset.file}
+                alt={selectedAsset.name}
+                borderRadius="md"
+                maxH="70vh"
+                objectFit="contain"
+              />
+            )}
+            {selectedAsset?.type === "video" && (
+              <video width="100%" height="auto" controls>
+                <source src={selectedAsset.file} />
+              </video>
+            )}
+            {selectedAsset?.type === "document" && (
+            <Box w="100%" h="600px">
+                <Worker workerUrl="https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js">
+                <Viewer fileUrl={`http://127.0.0.1:8000${new URL(selectedAsset.file).pathname}`} />
+                </Worker>
+            </Box>
+            )}
+            {selectedAsset?.type === "other" && (
+              <Box textAlign="center" p={4}>
+                <Text mb={4}>Preview not available</Text>
+                <Button
+                  as="a"
+                  href={selectedAsset.file}
+                  download
+                  colorScheme="blue"
+                >
+                  Download File
+                </Button>
+              </Box>
+            )}
+          </ModalBody>
+        </ModalContent>
+      </Modal>
     </Box>
   );
 }
