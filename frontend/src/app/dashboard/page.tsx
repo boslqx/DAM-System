@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
   Box,
   Grid,
@@ -12,8 +12,9 @@ import {
   Spinner,
   Flex,
   Button,
-  Input,
+  useToast,
 } from "@chakra-ui/react";
+import { useDropzone } from "react-dropzone";
 
 type Asset = {
   id: number;
@@ -26,8 +27,10 @@ type Asset = {
 export default function Dashboard() {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const toast = useToast();
 
+  // Fetch assets from Django API
   useEffect(() => {
     fetch("http://127.0.0.1:8000/api/assets/")
       .then((res) => res.json())
@@ -37,22 +40,26 @@ export default function Dashboard() {
       });
   }, []);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSelectedFile(e.target.files ? e.target.files[0] : null);
-  };
+  // File upload handler
+  const onDrop = useCallback(async (acceptedFiles: File[]) => {
+    const file = acceptedFiles[0];
+    if (!file) return;
 
-  const handleUpload = async () => {
-    if (!selectedFile) return alert("Please select a file first!");
+    setUploading(true);
 
     const formData = new FormData();
-    formData.append("name", selectedFile.name);
-    formData.append("file", selectedFile);
+    formData.append("name", file.name);
+    formData.append("file", file);
 
-    const fileType = selectedFile.name.split(".").pop()?.toLowerCase();
-    if (["jpg", "jpeg", "png"].includes(fileType!)) formData.append("type", "image");
-    else if (["mp4"].includes(fileType!)) formData.append("type", "video");
-    else if (["glb"].includes(fileType!)) formData.append("type", "model");
-    else return alert("Unsupported file type");
+    const ext = file.name.split(".").pop()?.toLowerCase();
+    if (["jpg", "jpeg", "png"].includes(ext!)) formData.append("type", "image");
+    else if (["mp4"].includes(ext!)) formData.append("type", "video");
+    else if (["glb"].includes(ext!)) formData.append("type", "model");
+    else {
+      toast({ title: "Unsupported file type", status: "error" });
+      setUploading(false);
+      return;
+    }
 
     const res = await fetch("http://127.0.0.1:8000/api/assets/", {
       method: "POST",
@@ -60,14 +67,23 @@ export default function Dashboard() {
     });
 
     if (res.ok) {
-      alert("Upload successful!");
       const newAsset = await res.json();
       setAssets((prev) => [newAsset, ...prev]);
-      setSelectedFile(null);
+      toast({ title: "Upload successful!", status: "success" });
     } else {
-      alert("Upload failed!");
+      toast({ title: "Upload failed!", status: "error" });
     }
-  };
+    setUploading(false);
+  }, [toast]);
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: {
+      "image/*": [".png", ".jpg", ".jpeg"],
+      "video/mp4": [".mp4"],
+      "model/gltf-binary": [".glb"],
+    },
+  });
 
   if (loading) {
     return (
@@ -83,33 +99,37 @@ export default function Dashboard() {
         Asset Dashboard
       </Heading>
 
-      {/* 🔹 Upload Section */}
-      <Flex
-        mb={8}
-        align="center"
-        justify="center"
-        direction="column"
-        bg="brand.100"
-        p={6}
+      {/* 🔹 Drag & Drop Upload Zone */}
+      <Box
+        {...getRootProps()}
+        border="2px dashed"
+        borderColor={isDragActive ? "brand.300" : "brand.200"}
+        bg={isDragActive ? "brand.100" : "white"}
         borderRadius="xl"
-        boxShadow="sm"
+        p={10}
+        textAlign="center"
+        mb={8}
+        cursor="pointer"
+        transition="0.2s ease"
       >
-        <Input
-          type="file"
-          onChange={handleFileChange}
-          mb={4}
-          bg="white"
-          p={2}
-        />
-        <Button
-          onClick={handleUpload}
-          bg="brand.200"
-          color="white"
-          _hover={{ bg: "brand.300" }}
-        >
-          Upload File
-        </Button>
-      </Flex>
+        <input {...getInputProps()} />
+        {uploading ? (
+          <Spinner size="lg" color="brand.200" />
+        ) : isDragActive ? (
+          <Text color="brand.300" fontWeight="bold">
+            Drop your file here...
+          </Text>
+        ) : (
+          <>
+            <Text fontSize="lg" color="brand.200">
+              Drag & Drop or Click to Upload
+            </Text>
+            <Text fontSize="sm" color="gray.600">
+              Supported: .jpg, .png, .mp4, .glb
+            </Text>
+          </>
+        )}
+      </Box>
 
       {/* 🔹 Asset Grid */}
       <Grid templateColumns="repeat(auto-fill, minmax(250px, 1fr))" gap={6}>
