@@ -1,23 +1,19 @@
 "use client";
-import { createSystem, defaultConfig } from "@chakra-ui/react";
+import { extendTheme, type ThemeConfig } from "@chakra-ui/react";
 
-export const theme = createSystem(defaultConfig, {
-  theme: {
-    tokens: {
-      colors: {
-        brand: {
-          50: { value: "#F5EFE6" },
-          100: { value: "#E8DFCA" },
-          200: { value: "#6D94C5" },
-          300: { value: "#CBDCEB" },
-        },
-      },
-    },
-    semanticTokens: {
-      colors: {
-        bg: { value: "{colors.brand.50}" },
-        text: { value: "{colors.gray.800}" },
-      },
+const config: ThemeConfig = {
+  initialColorMode: "light",
+  useSystemColorMode: false,
+};
+
+export const theme = extendTheme({
+  config,
+  colors: {
+    brand: {
+      50: "#F5EFE6",
+      100: "#E8DFCA",
+      200: "#6D94C5",
+      300: "#CBDCEB",
     },
   },
 });

@@ -8,5 +8,6 @@ type Props = {
 };
 
 export function Providers({ children }: Props) {
-  return <ChakraProvider value={theme}>{children}</ChakraProvider>;
+  return <ChakraProvider theme={theme}>{children}</ChakraProvider>
+
 }

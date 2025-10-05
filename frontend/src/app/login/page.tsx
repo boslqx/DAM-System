@@ -24,7 +24,12 @@ export default function LoginPage() {
   };
 
   return (
-    <Flex minH="100vh" align="center" justify="center" bg="brand.50">
+    <Flex
+      minH="100vh"
+      align="center"
+      justify="center"
+      bgGradient="linear(to-br, brand.50, brand.100, brand.200)"
+    >
       <Box
         bg="brand.100"
         p={10}
