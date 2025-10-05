@@ -52,14 +52,14 @@ export default function Dashboard() {
     formData.append("file", file);
 
     const ext = file.name.split(".").pop()?.toLowerCase();
-    if (["jpg", "jpeg", "png"].includes(ext!)) formData.append("type", "image");
-    else if (["mp4"].includes(ext!)) formData.append("type", "video");
-    else if (["glb"].includes(ext!)) formData.append("type", "model");
-    else {
-      toast({ title: "Unsupported file type", status: "error" });
-      setUploading(false);
-      return;
-    }
+
+    let detectedType = "other";
+    if (["jpg", "jpeg", "png", "gif"].includes(ext!)) detectedType = "image";
+    else if (["mp4", "mov", "avi"].includes(ext!)) detectedType = "video";
+    else if (["pdf", "docx", "pptx", "xlsx"].includes(ext!)) detectedType = "document";
+    else if (["glb", "gltf"].includes(ext!)) detectedType = "model";
+
+    formData.append("type", detectedType);
 
     const res = await fetch("http://127.0.0.1:8000/api/assets/", {
       method: "POST",
@@ -79,10 +79,8 @@ export default function Dashboard() {
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: {
-      "image/*": [".png", ".jpg", ".jpeg"],
-      "video/mp4": [".mp4"],
-      "model/gltf-binary": [".glb"],
-    },
+    "*/*": []},
+    multiple: true,
   });
 
   if (loading) {
@@ -125,7 +123,7 @@ export default function Dashboard() {
               Drag & Drop or Click to Upload
             </Text>
             <Text fontSize="sm" color="gray.600">
-              Supported: .jpg, .png, .mp4, .glb
+              Supported: Any file type (images, videos, PDFs, documents, 3D models, etc.)   
             </Text>
           </>
         )}
@@ -146,33 +144,73 @@ export default function Dashboard() {
             <VStack align="start" spacing={3}>
               {asset.type === "image" && (
                 <Image
-                  src={asset.file}
-                  alt={asset.name}
-                  borderRadius="md"
-                  w="100%"
-                  h="150px"
-                  objectFit="cover"
+                    src={asset.file}
+                    alt={asset.name}
+                    borderRadius="md"
+                    w="100%"
+                    h="150px"
+                    objectFit="cover"
                 />
-              )}
-              {asset.type === "video" && (
+                )}
+
+                {asset.type === "video" && (
                 <video width="100%" height="150" controls>
-                  <source src={asset.file} type="video/mp4" />
+                    <source src={asset.file} />
                 </video>
-              )}
-              {asset.type === "model" && (
+                )}
+
+                {asset.type === "document" && (
                 <Box
-                  w="100%"
-                  h="150px"
-                  bg="brand.300"
-                  display="flex"
-                  alignItems="center"
-                  justifyContent="center"
-                  color="white"
-                  fontWeight="bold"
+                    w="100%"
+                    h="150px"
+                    bg="gray.100"
+                    borderRadius="md"
+                    display="flex"
+                    alignItems="center"
+                    justifyContent="center"
+                    flexDirection="column"
                 >
-                  3D Model Preview (Coming Soon)
+                    <Text fontWeight="bold" color="brand.200">
+                    📄 {asset.name}
+                    </Text>
+                    <Button
+                    as="a"
+                    href={asset.file}
+                    download
+                    size="sm"
+                    mt={2}
+                    colorScheme="blue"
+                    >
+                    Download
+                    </Button>
                 </Box>
-              )}
+                )}
+
+                {asset.type === "other" && (
+                <Box
+                    w="100%"
+                    h="150px"
+                    bg="gray.50"
+                    borderRadius="md"
+                    display="flex"
+                    alignItems="center"
+                    justifyContent="center"
+                    flexDirection="column"
+                >
+                    <Text color="gray.600">🗂️ {asset.name}</Text>
+                    <Button
+                    as="a"
+                    href={asset.file}
+                    download
+                    size="sm"
+                    mt={2}
+                    colorScheme="blue"
+                    >
+                    Download
+                    </Button>
+                </Box>
+                )}
+
               <Text fontWeight="bold">{asset.name}</Text>
               <Text fontSize="sm" color="gray.600">
                 {asset.description || "No description"}
