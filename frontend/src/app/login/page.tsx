@@ -12,15 +12,36 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { useState } from "react";
+import axios from "axios";
+import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("");
+  const router = useRouter();
+  const [username, setUsername] = useState(""); // changed from email
   const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Logging in:", { email, password });
-    // TODO: connect to Django API later
+
+    try {
+      const res = await axios.post("http://127.0.0.1:8000/api/auth/login/", {
+        username,   // send username instead of email
+        password,
+      });
+
+      const { token, role } = res.data;
+
+      // Save token & role for later requests
+      localStorage.setItem("token", token);
+      localStorage.setItem("role", role);
+      localStorage.setItem("username", username);
+
+      // Redirect to dashboard
+      router.push("/dashboard");
+    } catch (err) {
+      setError("Invalid username or password");
+    }
   };
 
   return (
@@ -46,12 +67,12 @@ export default function LoginPage() {
           <form onSubmit={handleLogin}>
             <VStack spacing={5}>
               <FormControl isRequired>
-                <FormLabel>Email</FormLabel>
+                <FormLabel>Username</FormLabel>
                 <Input
-                  type="email"
-                  placeholder="Enter your email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  type="text" // changed from email
+                  placeholder="Enter your username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
                   bg="white"
                   _focus={{ borderColor: "brand.200" }}
                 />
@@ -68,6 +89,12 @@ export default function LoginPage() {
                   _focus={{ borderColor: "brand.200" }}
                 />
               </FormControl>
+
+              {error && (
+                <Text color="red.500" fontSize="sm">
+                  {error}
+                </Text>
+              )}
 
               <Button
                 type="submit"

@@ -1,14 +1,32 @@
 "use client";
 
-import { Box, VStack, IconButton, Tooltip } from "@chakra-ui/react";
+import { Box, VStack, IconButton, Tooltip, Text, Avatar } from "@chakra-ui/react";
 import { motion } from "framer-motion";
-import { Home, Upload, Settings } from "lucide-react";
-import { useState } from "react";
+import { Home, Upload, Settings, LogOut } from "lucide-react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 const MotionBox = motion(Box);
 
 export default function Sidebar() {
   const [isOpen, setIsOpen] = useState(false);
+  const [role, setRole] = useState<string | null>(null);
+  const [username, setUsername] = useState<string | null>(null);
+  const router = useRouter();
+
+  useEffect(() => {
+    const storedRole = localStorage.getItem("role");
+    const storedUsername = localStorage.getItem("username");
+    setRole(storedRole);
+    setUsername(storedUsername);
+  }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("role");
+    localStorage.removeItem("username");
+    router.push("/login");
+  };
 
   return (
     <MotionBox
@@ -32,6 +50,22 @@ export default function Sidebar() {
       overflow="hidden"
       p={2}
     >
+      {/* 🔹 User Info at top */}
+      <VStack spacing={2} mt={4}>
+        <Avatar name={username || "User"} size="sm" />
+        {isOpen && (
+          <>
+            <Text fontSize="sm" fontWeight="bold">
+              {username || "User"}
+            </Text>
+            <Text fontSize="xs" color="gray.600">
+              {role || "Role"}
+            </Text>
+          </>
+        )}
+      </VStack>
+
+      {/* 🔹 Main Sidebar Buttons */}
       <VStack spacing={4} mt={6}>
         <Tooltip label="Dashboard" placement="right">
           <IconButton aria-label="Dashboard" icon={<Home />} variant="ghost" />
@@ -43,7 +77,18 @@ export default function Sidebar() {
           <IconButton aria-label="Settings" icon={<Settings />} variant="ghost" />
         </Tooltip>
       </VStack>
+
+      {/* 🔹 Logout button at bottom */}
+      <VStack spacing={4} mb={6}>
+        <Tooltip label="Logout" placement="right">
+          <IconButton
+            aria-label="Logout"
+            icon={<LogOut />}
+            variant="ghost"
+            onClick={handleLogout}
+          />
+        </Tooltip>
+      </VStack>
     </MotionBox>
   );
 }
-
