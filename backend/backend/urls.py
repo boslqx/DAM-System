@@ -11,6 +11,7 @@ router.register(r'assets', AssetViewSet)
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', include(router.urls)),
+    path('api/auth/', include('users.urls')),
 ]
 
 if settings.DEBUG:
