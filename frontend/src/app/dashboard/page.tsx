@@ -163,13 +163,6 @@ export default function Dashboard() {
           Asset Dashboard
         </Heading>
 
-        {/* 🔹 Admin-only button */}
-        {role === "Admin" && (
-          <Button mb={4} colorScheme="red">
-            Manage Users
-          </Button>
-        )}
-
         {/* 🔹 Editor & Admin upload */}
         {(role === "Admin" || role === "Editor") && (
           <Box
