@@ -85,7 +85,7 @@ export default function Sidebar() {
               aria-label="Manage Users"
               icon={<Users />}
               variant="ghost"
-              onClick={() => goTo("/users")}
+              onClick={() => goTo("/manageuser")}
             />
           </Tooltip>
         )}
