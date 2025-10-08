@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, Fragment } from "react"; // Added Fragment import
+import { useEffect, useState, Fragment } from "react";
 import {
   Box,
   Heading,
@@ -22,9 +22,37 @@ import {
   Text,
   Tooltip,
   IconButton,
+  Grid,
+  GridItem,
+  Card,
+  CardHeader,
+  CardBody,
 } from "@chakra-ui/react";
 import Sidebar from "@/components/Sidebar";
 import { DownloadIcon, ChevronLeftIcon, ChevronRightIcon } from "@chakra-ui/icons";
+
+// Chart.js imports
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip as ChartTooltip,
+  Legend,
+  ChartOptions,
+} from 'chart.js';
+import { Bar } from 'react-chartjs-2';
+
+// Register Chart.js components
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  ChartTooltip,
+  Legend
+);
 
 interface ActivityLog {
   id: number;
@@ -61,21 +89,98 @@ export default function ActivityLogPage() {
     total_pages: 1,
   });
 
-  // Step 1: Add Pagination State Variables
+  // Pagination State Variables
   const [currentPage, setCurrentPage] = useState(1);
   const [logsPerPage, setLogsPerPage] = useState(10);
 
-  // Step 2: Add Pagination Calculations
+  // Pagination Calculations
   const indexOfLastLog = currentPage * logsPerPage;
   const indexOfFirstLog = indexOfLastLog - logsPerPage;
   const currentLogs = logs.slice(indexOfFirstLog, indexOfLastLog);
   const totalPages = Math.ceil(logs.length / logsPerPage);
+
+  // Chart data state
+  const [chartData, setChartData] = useState<any>(null);
 
   const getToken = (): string | null => {
     if (typeof window !== "undefined") {
       return localStorage.getItem("token");
     }
     return null;
+  };
+
+  // Function to process data for chart
+  const processChartData = (logs: ActivityLog[]) => {
+    const actionCounts: { [key: string]: number } = {};
+    
+    // Count occurrences of each action type
+    logs.forEach(log => {
+      const action = log.action_type || 'unknown';
+      actionCounts[action] = (actionCounts[action] || 0) + 1;
+    });
+
+    // Sort by count (descending)
+    const sortedActions = Object.entries(actionCounts)
+      .sort(([, a], [, b]) => b - a)
+      .reduce((acc, [key, value]) => {
+        acc[key] = value;
+        return acc;
+      }, {} as { [key: string]: number });
+
+    const actions = Object.keys(sortedActions);
+    const counts = Object.values(sortedActions);
+
+    // Generate colors based on action type
+    const backgroundColors = actions.map(action => {
+      const color = getActionColor(action);
+      return getColorValue(color);
+    });
+
+    const borderColors = actions.map(action => {
+      const color = getActionColor(action);
+      return getBorderColorValue(color);
+    });
+
+    return {
+      labels: actions,
+      datasets: [
+        {
+          label: 'Number of Actions',
+          data: counts,
+          backgroundColor: backgroundColors,
+          borderColor: borderColors,
+          borderWidth: 1,
+          borderRadius: 4,
+        },
+      ],
+    };
+  };
+
+  // Helper function to convert Chakra UI color names to hex values
+  const getColorValue = (color: string): string => {
+    const colorMap: { [key: string]: string } = {
+      green: 'rgba(72, 187, 120, 0.7)',
+      orange: 'rgba(237, 137, 54, 0.7)',
+      red: 'rgba(245, 101, 101, 0.7)',
+      blue: 'rgba(66, 153, 225, 0.7)',
+      teal: 'rgba(56, 178, 172, 0.7)',
+      purple: 'rgba(159, 122, 234, 0.7)',
+      gray: 'rgba(160, 174, 192, 0.7)',
+    };
+    return colorMap[color] || 'rgba(160, 174, 192, 0.7)';
+  };
+
+  const getBorderColorValue = (color: string): string => {
+    const colorMap: { [key: string]: string } = {
+      green: 'rgb(72, 187, 120)',
+      orange: 'rgb(237, 137, 54)',
+      red: 'rgb(245, 101, 101)',
+      blue: 'rgb(66, 153, 225)',
+      teal: 'rgb(56, 178, 172)',
+      purple: 'rgb(159, 122, 234)',
+      gray: 'rgb(160, 174, 192)',
+    };
+    return colorMap[color] || 'rgb(160, 174, 192)';
   };
 
   const fetchLogs = async (page: number = 1) => {
@@ -91,7 +196,7 @@ export default function ActivityLogPage() {
       if (filters.start_date) params.append('start_date', filters.start_date);
       if (filters.end_date) params.append('end_date', filters.end_date);
       params.append('page', page.toString());
-      params.append('page_size', '20'); // You can adjust page size as needed
+      params.append('page_size', '20');
       
       const queryString = params.toString();
       const url = `http://127.0.0.1:8000/api/activity/logs/${queryString ? `?${queryString}` : ''}`;
@@ -116,27 +221,25 @@ export default function ActivityLogPage() {
 
       const data = await res.json();
       
-      // Step 5: Update fetchLogs to Reset Page
-      setCurrentPage(1); // Reset to first page on fetch
+      setCurrentPage(1);
       
-      // Assuming your API returns pagination info along with results
-      // Adjust this based on your actual API response structure
+      let logsData: ActivityLog[] = [];
       if (data.results && data.pagination) {
-        // If your API uses 'results' for data and 'pagination' for metadata
+        logsData = data.results;
         setLogs(data.results);
         setPagination(data.pagination);
       } else if (data.results && data.count !== undefined) {
-        // If your API uses Django REST framework style pagination
+        logsData = data.results;
         setLogs(data.results);
         setPagination({
           count: data.count,
           next: data.next,
           previous: data.previous,
           current_page: page,
-          total_pages: Math.ceil(data.count / 20), // Adjust based on your page_size
+          total_pages: Math.ceil(data.count / 20),
         });
       } else {
-        // If no pagination, assume it's all results
+        logsData = data;
         setLogs(data);
         setPagination({
           count: data.length,
@@ -146,6 +249,9 @@ export default function ActivityLogPage() {
           total_pages: 1,
         });
       }
+
+      // Process chart data after setting logs
+      setChartData(processChartData(logsData));
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -169,18 +275,56 @@ export default function ActivityLogPage() {
     }
   };
 
-  // ✅ Export to CSV function - exports ALL data, not just current page
+  // Chart options
+  const chartOptions: ChartOptions<'bar'> = {
+    responsive: true,
+    plugins: {
+      legend: {
+        position: 'top' as const,
+      },
+      title: {
+        display: true,
+        text: 'Activity Log Distribution by Action Type',
+      },
+      tooltip: {
+        callbacks: {
+          label: function(context) {
+            return `${context.dataset.label}: ${context.parsed.y}`;
+          }
+        }
+      }
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+        title: {
+          display: true,
+          text: 'Number of Actions'
+        },
+        ticks: {
+          stepSize: 1
+        }
+      },
+      x: {
+        title: {
+          display: true,
+          text: 'Action Types'
+        }
+      }
+    },
+  };
+
+  // Export to CSV function
   const exportToCSV = async () => {
     try {
       const token = getToken();
       
-      // Build query parameters for ALL data (no pagination)
       const params = new URLSearchParams();
       if (filters.search) params.append('search', filters.search);
       if (filters.action_type) params.append('action_type', filters.action_type);
       if (filters.start_date) params.append('start_date', filters.start_date);
       if (filters.end_date) params.append('end_date', filters.end_date);
-      params.append('page_size', '10000'); // Large number to get all data
+      params.append('page_size', '10000');
       
       const queryString = params.toString();
       const url = `http://127.0.0.1:8000/api/activity/logs/${queryString ? `?${queryString}` : ''}`;
@@ -196,7 +340,7 @@ export default function ActivityLogPage() {
       }
 
       const data = await res.json();
-      const exportLogs = data.results || data; // Handle both paginated and non-paginated responses
+      const exportLogs = data.results || data;
 
       if (exportLogs.length === 0) {
         alert('No data to export');
@@ -231,7 +375,7 @@ export default function ActivityLogPage() {
     }
   };
 
-  // ✅ Clear all filters
+  // Clear all filters
   const clearAllFilters = () => {
     setFilters({
       search: "",
@@ -239,17 +383,17 @@ export default function ActivityLogPage() {
       start_date: "",
       end_date: "",
     });
-    setCurrentPage(1); // Add this
+    setCurrentPage(1);
     setTimeout(() => fetchLogs(1), 100);
   };
 
-  // ✅ Apply filters
+  // Apply filters
   const applyFilters = () => {
-    setCurrentPage(1); // Add this
+    setCurrentPage(1);
     fetchLogs(1);
   };
 
-  // Step 4: Add Pagination Handlers
+  // Pagination handlers
   const goToNextPage = () => {
     setCurrentPage(prev => Math.min(prev + 1, totalPages));
   };
@@ -260,39 +404,6 @@ export default function ActivityLogPage() {
 
   const goToPage = (page: number) => {
     setCurrentPage(Math.max(1, Math.min(page, totalPages)));
-  };
-
-  // ✅ Server-side pagination handlers (keep your existing ones)
-  const goToServerPage = (page: number) => {
-    if (page >= 1 && page <= pagination.total_pages) {
-      fetchLogs(page);
-    }
-  };
-
-  // ✅ Generate page numbers for server-side pagination (keep your existing ones)
-  const getPageNumbers = () => {
-    const current = pagination.current_page;
-    const total = pagination.total_pages;
-    const delta = 2; // Number of pages to show on each side of current page
-    const range = [];
-    const rangeWithDots = [];
-
-    for (let i = 1; i <= total; i++) {
-      if (i === 1 || i === total || (i >= current - delta && i <= current + delta)) {
-        range.push(i);
-      }
-    }
-
-    let prev = 0;
-    for (const i of range) {
-      if (prev !== 0 && i - prev !== 1) {
-        rangeWithDots.push('...');
-      }
-      rangeWithDots.push(i);
-      prev = i;
-    }
-
-    return rangeWithDots;
   };
 
   return (
@@ -316,7 +427,7 @@ export default function ActivityLogPage() {
           </Tooltip>
         </Flex>
 
-        {/* ✅ Compact Filter Row */}
+        {/* Compact Filter Row */}
         <Flex direction="column" mb={6}>
           <HStack spacing={4} mb={3} flexWrap="wrap" align="flex-end">
             {/* Search Input */}
@@ -374,7 +485,7 @@ export default function ActivityLogPage() {
               />
             </Box>
 
-            {/* Step 8: Add Items Per Page Selector */}
+            {/* Items Per Page Selector */}
             <Box>
               <Text fontSize="sm" mb={1} color="gray.600" fontWeight="medium">Show</Text>
               <Select
@@ -423,7 +534,7 @@ export default function ActivityLogPage() {
           </Alert>
         )}
 
-        {/* Step 8: Update Results Summary */}
+        {/* Results Summary */}
         {!loading && (
           <Text color="gray.600" mb={4}>
             Showing {indexOfFirstLog + 1} to {Math.min(indexOfLastLog, logs.length)} of {logs.length} log entries
@@ -431,6 +542,20 @@ export default function ActivityLogPage() {
             {filters.end_date && ` to ${filters.end_date}`}
             {totalPages > 1 && ` (Page ${currentPage} of ${totalPages})`}
           </Text>
+        )}
+
+        {/* Chart Visualization */}
+        {!loading && chartData && logs.length > 0 && (
+          <Card mb={6} bg="white" borderRadius="xl" boxShadow="sm" border="1px solid" borderColor="gray.200">
+            <CardHeader pb={2}>
+              <Heading size="md">Activity Distribution</Heading>
+            </CardHeader>
+            <CardBody pt={0}>
+              <Box height="300px">
+                <Bar data={chartData} options={chartOptions} />
+              </Box>
+            </CardBody>
+          </Card>
         )}
 
         <Box bg="white" p={6} borderRadius="xl" boxShadow="sm" border="1px solid" borderColor="gray.200">
@@ -460,7 +585,6 @@ export default function ActivityLogPage() {
                   </Tr>
                 </Thead>
                 <Tbody>
-                  {/* Step 9: Update Table to Use currentLogs */}
                   {currentLogs.map((log, index) => (
                     <Tr 
                       key={log.id} 
@@ -492,7 +616,7 @@ export default function ActivityLogPage() {
                 </Tbody>
               </Table>
 
-              {/* Step 10: Add Client-side Pagination Controls */}
+              {/* Pagination Controls */}
               {totalPages > 1 && (
                 <Flex justify="space-between" align="center" mt={6} flexWrap="wrap" gap={4}>
                   <Text fontSize="sm" color="gray.600">
@@ -512,7 +636,6 @@ export default function ActivityLogPage() {
                     {/* Page numbers */}
                     {Array.from({ length: totalPages }, (_, i) => i + 1)
                       .filter(page => {
-                        // Show first page, last page, current page, and pages around current
                         return page === 1 || 
                                page === totalPages || 
                                (page >= currentPage - 1 && page <= currentPage + 1);
@@ -543,16 +666,6 @@ export default function ActivityLogPage() {
                       variant="outline"
                     />
                   </HStack>
-                </Flex>
-              )}
-
-              {/* Keep your existing server-side pagination for reference */}
-              {/* You can remove this if you don't need both */}
-              {pagination.total_pages > 1 && (
-                <Flex justify="center" align="center" mt={4} gap={2}>
-                  <Text fontSize="sm" color="gray.500" mb={2}>
-                    Server-side pagination (API): Page {pagination.current_page} of {pagination.total_pages}
-                  </Text>
                 </Flex>
               )}
             </>
