@@ -21,6 +21,16 @@ import {
   Badge,
   IconButton,
   Tooltip,
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalHeader,
+  ModalCloseButton,
+  ModalBody,
+  ModalFooter,
+  Input,
+  FormControl,
+  FormLabel,
 } from "@chakra-ui/react";
 import { DeleteIcon, EditIcon } from "@chakra-ui/icons";
 import Sidebar from "@/components/Sidebar";
@@ -35,10 +45,19 @@ interface User {
 
 export default function ManageUserPage() {
   const [users, setUsers] = useState<User[]>([]);
+  const [allUsers, setAllUsers] = useState<User[]>([]); // For search filtering
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [updatingUserId, setUpdatingUserId] = useState<number | null>(null);
   const [deletingUserId, setDeletingUserId] = useState<number | null>(null);
+  const [isOpen, setIsOpen] = useState(false);
+  const [newUser, setNewUser] = useState({ 
+    username: "", 
+    email: "", 
+    password: "", 
+    role: "Viewer" as 'Admin' | 'Editor' | 'Viewer' 
+  });
+  const [creatingUser, setCreatingUser] = useState(false);
   
   const toast = useToast();
   const router = useRouter();
@@ -99,6 +118,7 @@ export default function ManageUserPage() {
       
       const data = await res.json();
       setUsers(data);
+      setAllUsers(data); // Store all users for search filtering
     } catch (err: any) {
       setError(err.message);
       toast({
@@ -140,9 +160,22 @@ export default function ManageUserPage() {
         duration: 3000,
         isClosable: true,
       });
+
+      // Activity log feedback
+      toast({
+        title: "Action logged to Activity Log",
+        status: "info",
+        duration: 2000,
+        isClosable: true,
+      });
       
       // Optimistic update
       setUsers(prevUsers => 
+        prevUsers.map(user => 
+          user.id === userId ? { ...user, role: newRole as User['role'] } : user
+        )
+      );
+      setAllUsers(prevUsers => 
         prevUsers.map(user => 
           user.id === userId ? { ...user, role: newRole as User['role'] } : user
         )
@@ -183,9 +216,18 @@ export default function ManageUserPage() {
         duration: 3000,
         isClosable: true,
       });
+
+      // Activity log feedback
+      toast({
+        title: "Action logged to Activity Log",
+        status: "info",
+        duration: 2000,
+        isClosable: true,
+      });
       
       // Optimistic update
       setUsers(prevUsers => prevUsers.filter(user => user.id !== userId));
+      setAllUsers(prevUsers => prevUsers.filter(user => user.id !== userId));
     } catch (err: any) {
       toast({
         title: "Error deleting user",
@@ -199,6 +241,73 @@ export default function ManageUserPage() {
     } finally {
       setDeletingUserId(null);
     }
+  };
+
+  // 🔹 Create new user
+  const handleCreateUser = async () => {
+    try {
+      setCreatingUser(true);
+      const token = getToken();
+      
+      const res = await fetch("http://127.0.0.1:8000/api/users/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Token ${token}`,
+        },
+        body: JSON.stringify(newUser),
+      });
+      
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || "Failed to create user");
+      }
+      
+      toast({
+        title: "User created successfully",
+        status: "success",
+        duration: 3000,
+        isClosable: true,
+      });
+
+      // Activity log feedback
+      toast({
+        title: "Action logged to Activity Log",
+        status: "info",
+        duration: 2000,
+        isClosable: true,
+      });
+      
+      setIsOpen(false);
+      fetchUsers(); // Refresh the list
+      setNewUser({ username: "", email: "", password: "", role: "Viewer" });
+    } catch (err: any) {
+      toast({
+        title: "Error creating user",
+        description: err.message,
+        status: "error",
+        duration: 4000,
+        isClosable: true,
+      });
+    } finally {
+      setCreatingUser(false);
+    }
+  };
+
+  // 🔹 Search/filter users
+  const handleSearch = (query: string) => {
+    if (!query.trim()) {
+      setUsers(allUsers); // Reset to all users if search is empty
+      return;
+    }
+    
+    const lowerQuery = query.toLowerCase();
+    const filteredUsers = allUsers.filter(user => 
+      user.username.toLowerCase().includes(lowerQuery) || 
+      user.role.toLowerCase().includes(lowerQuery) ||
+      user.email.toLowerCase().includes(lowerQuery)
+    );
+    setUsers(filteredUsers);
   };
 
   // 🔹 Role color mapping
@@ -235,14 +344,28 @@ export default function ManageUserPage() {
       >
         <Flex justify="space-between" align="center" mb={6}>
           <Heading color="gray.700">User Management</Heading>
-          <Button 
-            colorScheme="blue" 
-            onClick={fetchUsers}
-            isLoading={loading && users.length > 0}
-          >
-            Refresh
-          </Button>
+          <Flex gap={3}>
+            <Button colorScheme="green" onClick={() => setIsOpen(true)}>
+              + Add User
+            </Button>
+            <Button 
+              colorScheme="blue" 
+              onClick={fetchUsers}
+              isLoading={loading && users.length > 0}
+            >
+              Refresh
+            </Button>
+          </Flex>
         </Flex>
+
+        {/* Search Input */}
+        <Input
+          placeholder="Search by username, email, or role..."
+          maxW="300px"
+          mb={4}
+          bg="white"
+          onChange={(e) => handleSearch(e.target.value)}
+        />
 
         {error && (
           <Alert status="error" mb={4} borderRadius="md">
@@ -261,7 +384,9 @@ export default function ManageUserPage() {
         >
           {users.length === 0 && !loading ? (
             <Flex justify="center" align="center" py={8}>
-              <Text color="gray.500">No users found.</Text>
+              <Text color="gray.500">
+                {allUsers.length === 0 ? "No users found." : "No users match your search."}
+              </Text>
             </Flex>
           ) : (
             <Table variant="simple" size="md">
@@ -334,6 +459,74 @@ export default function ManageUserPage() {
             </Table>
           )}
         </Box>
+
+        {/* Create User Modal */}
+        <Modal isOpen={isOpen} onClose={() => setIsOpen(false)}>
+          <ModalOverlay />
+          <ModalContent>
+            <ModalHeader>Create New User</ModalHeader>
+            <ModalCloseButton />
+            <ModalBody>
+              <FormControl mb={3} isRequired>
+                <FormLabel>Username</FormLabel>
+                <Input 
+                  value={newUser.username} 
+                  onChange={(e) => setNewUser({ ...newUser, username: e.target.value })} 
+                  placeholder="Enter username"
+                />
+              </FormControl>
+              <FormControl mb={3} isRequired>
+                <FormLabel>Email</FormLabel>
+                <Input 
+                  type="email"
+                  value={newUser.email} 
+                  onChange={(e) => setNewUser({ ...newUser, email: e.target.value })} 
+                  placeholder="Enter email"
+                />
+              </FormControl>
+              <FormControl mb={3} isRequired>
+                <FormLabel>Password</FormLabel>
+                <Input 
+                  type="password" 
+                  value={newUser.password} 
+                  onChange={(e) => setNewUser({ ...newUser, password: e.target.value })} 
+                  placeholder="Enter password"
+                />
+              </FormControl>
+              <FormControl>
+                <FormLabel>Role</FormLabel>
+                <Select 
+                  value={newUser.role} 
+                  onChange={(e) => setNewUser({ ...newUser, role: e.target.value as 'Admin' | 'Editor' | 'Viewer' })}
+                >
+                  <option value="Admin">Admin</option>
+                  <option value="Editor">Editor</option>
+                  <option value="Viewer">Viewer</option>
+                </Select>
+              </FormControl>
+            </ModalBody>
+            <ModalFooter>
+              <Button 
+                colorScheme="blue" 
+                mr={3} 
+                onClick={handleCreateUser}
+                isLoading={creatingUser}
+                isDisabled={!newUser.username || !newUser.email || !newUser.password}
+              >
+                Create
+              </Button>
+              <Button 
+                onClick={() => {
+                  setIsOpen(false);
+                  setNewUser({ username: "", email: "", password: "", role: "Viewer" });
+                }}
+                isDisabled={creatingUser}
+              >
+                Cancel
+              </Button>
+            </ModalFooter>
+          </ModalContent>
+        </Modal>
       </Box>
     </Flex>
   );
