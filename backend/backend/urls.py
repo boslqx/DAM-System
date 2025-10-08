@@ -14,6 +14,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', include(router.urls)), # DRF routes
     path('api/auth/', include('users.urls')), 
+    path('api/', include('assets.urls')),
     path('api/activity/', include('activitylog.urls')),
     path('api/users/', include('users.urls')),
 ]
