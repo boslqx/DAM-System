@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Fragment } from "react";
 import {
   Box,
   Heading,
@@ -31,10 +31,12 @@ import {
   Input,
   FormControl,
   FormLabel,
+  HStack,
 } from "@chakra-ui/react";
-import { DeleteIcon, EditIcon } from "@chakra-ui/icons";
+import { DeleteIcon, EditIcon, ChevronLeftIcon, ChevronRightIcon } from "@chakra-ui/icons";
 import Sidebar from "@/components/Sidebar";
 import { useRouter } from "next/navigation";
+
 
 interface User {
   id: number;
@@ -59,8 +61,18 @@ export default function ManageUserPage() {
   });
   const [creatingUser, setCreatingUser] = useState(false);
   
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const [usersPerPage, setUsersPerPage] = useState(10);
+
   const toast = useToast();
   const router = useRouter();
+
+  // Calculate pagination
+  const indexOfLastUser = currentPage * usersPerPage;
+  const indexOfFirstUser = indexOfLastUser - usersPerPage;
+  const currentUsers = users.slice(indexOfFirstUser, indexOfLastUser);
+  const totalPages = Math.ceil(users.length / usersPerPage);
 
   // 🔹 Safe token retrieval
   const getToken = (): string | null => {
@@ -119,6 +131,7 @@ export default function ManageUserPage() {
       const data = await res.json();
       setUsers(data);
       setAllUsers(data); // Store all users for search filtering
+      setCurrentPage(1); // Reset to first page on fetch
     } catch (err: any) {
       setError(err.message);
       toast({
@@ -226,8 +239,15 @@ export default function ManageUserPage() {
       });
       
       // Optimistic update
-      setUsers(prevUsers => prevUsers.filter(user => user.id !== userId));
+      const newUsers = users.filter(user => user.id !== userId);
+      setUsers(newUsers);
       setAllUsers(prevUsers => prevUsers.filter(user => user.id !== userId));
+      
+      // Adjust page if needed
+      const newTotalPages = Math.ceil(newUsers.length / usersPerPage);
+      if (currentPage > newTotalPages && newTotalPages > 0) {
+        setCurrentPage(newTotalPages);
+      }
     } catch (err: any) {
       toast({
         title: "Error deleting user",
@@ -298,6 +318,7 @@ export default function ManageUserPage() {
   const handleSearch = (query: string) => {
     if (!query.trim()) {
       setUsers(allUsers); // Reset to all users if search is empty
+      setCurrentPage(1); // Reset to first page
       return;
     }
     
@@ -308,6 +329,7 @@ export default function ManageUserPage() {
       user.email.toLowerCase().includes(lowerQuery)
     );
     setUsers(filteredUsers);
+    setCurrentPage(1); // Reset to first page
   };
 
   // 🔹 Role color mapping
@@ -318,6 +340,19 @@ export default function ManageUserPage() {
       case 'Viewer': return 'green';
       default: return 'gray';
     }
+  };
+
+  // Pagination handlers
+  const goToNextPage = () => {
+    setCurrentPage(prev => Math.min(prev + 1, totalPages));
+  };
+
+  const goToPreviousPage = () => {
+    setCurrentPage(prev => Math.max(prev - 1, 1));
+  };
+
+  const goToPage = (page: number) => {
+    setCurrentPage(Math.max(1, Math.min(page, totalPages)));
   };
 
   // 🔹 Enhanced loading state
@@ -358,14 +393,34 @@ export default function ManageUserPage() {
           </Flex>
         </Flex>
 
-        {/* Search Input */}
-        <Input
-          placeholder="Search by username, email, or role..."
-          maxW="300px"
-          mb={4}
-          bg="white"
-          onChange={(e) => handleSearch(e.target.value)}
-        />
+        {/* Search Input and Items Per Page */}
+        <Flex mb={4} gap={3} align="center" wrap="wrap">
+          <Input
+            placeholder="Search by username, email, or role..."
+            maxW="300px"
+            bg="white"
+            onChange={(e) => handleSearch(e.target.value)}
+          />
+          <Flex align="center" gap={2}>
+            <Text fontSize="sm" color="gray.600">Show:</Text>
+            <Select
+              value={usersPerPage}
+              onChange={(e) => {
+                setUsersPerPage(Number(e.target.value));
+                setCurrentPage(1);
+              }}
+              size="sm"
+              width="80px"
+              bg="white"
+            >
+              <option value={5}>5</option>
+              <option value={10}>10</option>
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+            </Select>
+            <Text fontSize="sm" color="gray.600">per page</Text>
+          </Flex>
+        </Flex>
 
         {error && (
           <Alert status="error" mb={4} borderRadius="md">
@@ -389,74 +444,129 @@ export default function ManageUserPage() {
               </Text>
             </Flex>
           ) : (
-            <Table variant="simple" size="md">
-              <Thead bg="brand.200">
-                <Tr>
-                  <Th color="white" fontSize="sm" fontWeight="bold">ID</Th>
-                  <Th color="white" fontSize="sm" fontWeight="bold">Username</Th>
-                  <Th color="white" fontSize="sm" fontWeight="bold">Email</Th>
-                  <Th color="white" fontSize="sm" fontWeight="bold">Role</Th>
-                  <Th color="white" fontSize="sm" fontWeight="bold" textAlign="center">Actions</Th>
-                </Tr>
-              </Thead>
-              <Tbody>
-                {users.map((user, index) => (
-                  <Tr 
-                    key={user.id} 
-                    bg={index % 2 === 0 ? "white" : "gray.50"}
-                    _hover={{ bg: "brand.100", transition: "background 0.2s" }}
-                  >
-                    <Td fontWeight="medium" color="gray.600">{user.id}</Td>
-                    <Td fontWeight="medium" color="gray.800">{user.username}</Td>
-                    <Td color="gray.600">{user.email}</Td>
-                    <Td>
-                      <Flex align="center" gap={2}>
-                        <Badge 
-                          colorScheme={getRoleColor(user.role)}
-                          variant="subtle"
-                          px={2}
-                          py={1}
-                          borderRadius="md"
-                        >
-                          {user.role}
-                        </Badge>
-                        <Select
-                          size="xs"
-                          value={user.role}
-                          onChange={(e) => handleRoleChange(user.id, e.target.value)}
-                          bg="white"
-                          borderColor="gray.300"
-                          width="100px"
-                          isDisabled={updatingUserId === user.id}
-                          _focus={{ borderColor: "blue.500", boxShadow: "0 0 0 1px blue.500" }}
-                        >
-                          <option value="Admin">Admin</option>
-                          <option value="Editor">Editor</option>
-                          <option value="Viewer">Viewer</option>
-                        </Select>
-                        {updatingUserId === user.id && (
-                          <Spinner size="sm" color="blue.500" />
-                        )}
-                      </Flex>
-                    </Td>
-                    <Td textAlign="center">
-                      <Tooltip label="Delete user" hasArrow>
-                        <IconButton
-                          aria-label="Delete user"
-                          icon={<DeleteIcon />}
-                          size="sm"
-                          colorScheme="red"
-                          variant="ghost"
-                          onClick={() => handleDelete(user.id)}
-                          isLoading={deletingUserId === user.id}
-                          isDisabled={deletingUserId !== null}
-                        />
-                      </Tooltip>
-                    </Td>
+            <>
+              <Table variant="simple" size="md">
+                <Thead bg="brand.200">
+                  <Tr>
+                    <Th color="white" fontSize="sm" fontWeight="bold">ID</Th>
+                    <Th color="white" fontSize="sm" fontWeight="bold">Username</Th>
+                    <Th color="white" fontSize="sm" fontWeight="bold">Email</Th>
+                    <Th color="white" fontSize="sm" fontWeight="bold">Role</Th>
+                    <Th color="white" fontSize="sm" fontWeight="bold" textAlign="center">Actions</Th>
                   </Tr>
-                ))}
-              </Tbody>
-            </Table>
+                </Thead>
+                <Tbody>
+                  {currentUsers.map((user, index) => (
+                    <Tr 
+                      key={user.id} 
+                      bg={index % 2 === 0 ? "white" : "gray.50"}
+                      _hover={{ bg: "brand.100", transition: "background 0.2s" }}
+                    >
+                      <Td fontWeight="medium" color="gray.600">{user.id}</Td>
+                      <Td fontWeight="medium" color="gray.800">{user.username}</Td>
+                      <Td color="gray.600">{user.email}</Td>
+                      <Td>
+                        <Flex align="center" gap={2}>
+                          <Badge 
+                            colorScheme={getRoleColor(user.role)}
+                            variant="subtle"
+                            px={2}
+                            py={1}
+                            borderRadius="md"
+                          >
+                            {user.role}
+                          </Badge>
+                          <Select
+                            size="xs"
+                            value={user.role}
+                            onChange={(e) => handleRoleChange(user.id, e.target.value)}
+                            bg="white"
+                            borderColor="gray.300"
+                            width="100px"
+                            isDisabled={updatingUserId === user.id}
+                            _focus={{ borderColor: "blue.500", boxShadow: "0 0 0 1px blue.500" }}
+                          >
+                            <option value="Admin">Admin</option>
+                            <option value="Editor">Editor</option>
+                            <option value="Viewer">Viewer</option>
+                          </Select>
+                          {updatingUserId === user.id && (
+                            <Spinner size="sm" color="blue.500" />
+                          )}
+                        </Flex>
+                      </Td>
+                      <Td textAlign="center">
+                        <Tooltip label="Delete user" hasArrow>
+                          <IconButton
+                            aria-label="Delete user"
+                            icon={<DeleteIcon />}
+                            size="sm"
+                            colorScheme="red"
+                            variant="ghost"
+                            onClick={() => handleDelete(user.id)}
+                            isLoading={deletingUserId === user.id}
+                            isDisabled={deletingUserId !== null}
+                          />
+                        </Tooltip>
+                      </Td>
+                    </Tr>
+                  ))}
+                </Tbody>
+              </Table>
+
+              {/* Pagination Controls */}
+              {totalPages > 1 && (
+                <Flex justify="space-between" align="center" mt={6} flexWrap="wrap" gap={4}>
+                  <Text fontSize="sm" color="gray.600">
+                    Showing {indexOfFirstUser + 1} to {Math.min(indexOfLastUser, users.length)} of {users.length} users
+                  </Text>
+                  
+                  <HStack spacing={2}>
+                    <IconButton
+                      aria-label="Previous page"
+                      icon={<ChevronLeftIcon />}
+                      onClick={goToPreviousPage}
+                      isDisabled={currentPage === 1}
+                      size="sm"
+                      variant="outline"
+                    />
+                    
+                    {/* Page numbers */}
+                    {Array.from({ length: totalPages }, (_, i) => i + 1)
+                      .filter(page => {
+                        // Show first page, last page, current page, and pages around current
+                        return page === 1 || 
+                              page === totalPages || 
+                              (page >= currentPage - 1 && page <= currentPage + 1);
+                      })
+                      .map((page, index, array) => (
+                        <Fragment key={page}>
+                          {index > 0 && array[index - 1] !== page - 1 && (
+                            <Text color="gray.400" px={1}>...</Text>
+                          )}
+                          <Button
+                            size="sm"
+                            onClick={() => goToPage(page)}
+                            colorScheme={currentPage === page ? "blue" : "gray"}
+                            variant={currentPage === page ? "solid" : "outline"}
+                          >
+                            {page}
+                          </Button>
+                        </Fragment>
+                      ))}
+                    
+                    <IconButton
+                      aria-label="Next page"
+                      icon={<ChevronRightIcon />}
+                      onClick={goToNextPage}
+                      isDisabled={currentPage === totalPages}
+                      size="sm"
+                      variant="outline"
+                    />
+                  </HStack>
+                </Flex>
+              )}
+            </>
           )}
         </Box>
 

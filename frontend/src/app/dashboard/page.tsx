@@ -159,7 +159,7 @@ export default function Dashboard() {
       <Sidebar />
 
       <Box flex="1" p={8} bg="brand.50" minH="100vh" ml={{ base: "0", md: "60px" }} transition="margin 0.3s ease">
-        <Heading mb={6} textAlign="center" color="brand.200">
+        <Heading mb={6} color="gray.700">
           Asset Dashboard
         </Heading>
 

@@ -4,22 +4,35 @@ from rest_framework.response import Response
 from rest_framework import status, viewsets
 from rest_framework.authtoken.models import Token
 from django.contrib.auth import authenticate
-from .models import User, ActivityLog
+from .models import User
 from .serializers import UserSerializer, UserCreateSerializer, ActivityLogSerializer
-from .permissions import IsAdmin, IsEditorOrAdmin, IsViewerOrHigher  # Import your existing permissions
+from .permissions import IsAdmin, IsEditorOrAdmin, IsViewerOrHigher
+from activitylog.models import ActivityLog  # ✅ Import the correct ActivityLog model
 
-# 🔹 Valid roles constant
+
+# =========================================================
+# 🔹 VALID ROLES CONSTANT
+# =========================================================
 VALID_ROLES = ["Admin", "Editor", "Viewer"]
 
-# 🔹 Activity Logging Function
-def log_action(user, action, record_id, description, table_affected="User"):
-    ActivityLog.objects.create(
-        UserID=user,
-        ActionType=action,
-        TableAffected=table_affected,
-        RecordID=record_id,
-        Description=description
-    )
+
+# =========================================================
+# 🔹 ACTIVITY LOGGING FUNCTION (helper)
+# =========================================================
+def log_action(user, action, description, ip_address=None):
+    """
+    Central logging function to record all user activities.
+    """
+    try:
+        ActivityLog.objects.create(
+            user=user,
+            action_type=action.lower(),  # normalize
+            description=description,
+            ip_address=ip_address
+        )
+    except Exception as e:
+        print(f"⚠️ Failed to log action: {e}")  # optional safeguard
+
 
 # =========================================================
 # 🔹 LOGIN VIEW (returns token + user info)
@@ -33,23 +46,23 @@ def login_view(request):
     user = authenticate(username=username, password=password)
     if user is not None:
         token, _ = Token.objects.get_or_create(user=user)
-        
-        # Log login action
+
+        # Log login
         log_action(
             user,
-            "VIEW",
-            user.id,
+            "login",
             f"User {user.username} logged in",
-            "Authentication"
+            ip_address=request.META.get('REMOTE_ADDR')
         )
-        
+
         return Response({
             'user_id': user.id,
             'username': user.username,
             'role': user.role,
             'token': token.key
         })
-    return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
+    else:
+        return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
 
 
 # =========================================================
@@ -57,20 +70,14 @@ def login_view(request):
 # =========================================================
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
-    
+
     def get_permissions(self):
-        """
-        Assign permissions based on action:
-        - Only Admin can create, update, delete users
-        - Editors and Admins can view user list
-        - Everyone can view their own profile
-        """
         if self.action in ['create', 'update', 'partial_update', 'destroy']:
             permission_classes = [IsAdmin]
         elif self.action in ['list']:
-            permission_classes = [IsEditorOrAdmin]  # Editors can view user list
-        else:  # retrieve (view single user)
-            permission_classes = [IsViewerOrHigher]  # Anyone can view user details
+            permission_classes = [IsEditorOrAdmin]
+        else:
+            permission_classes = [IsViewerOrHigher]
         return [permission() for permission in permission_classes]
 
     def get_serializer_class(self):
@@ -78,16 +85,16 @@ class UserViewSet(viewsets.ModelViewSet):
             return UserCreateSerializer
         return UserSerializer
 
-    # 🟡 Create new user (Admin only)
+    # 🟡 Create new user
     def create(self, request, *args, **kwargs):
         username = request.data.get('username')
         password = request.data.get('password')
         role = request.data.get('role')
         email = request.data.get('email')
 
-        if not username or not password or not role or not email:
-            return Response({'error': 'All fields are required: username, email, password, role'}, 
-                          status=status.HTTP_400_BAD_REQUEST)
+        if not all([username, password, role, email]):
+            return Response({'error': 'All fields are required: username, email, password, role'},
+                            status=status.HTTP_400_BAD_REQUEST)
 
         if role not in VALID_ROLES:
             return Response({'error': 'Invalid role'}, status=status.HTTP_400_BAD_REQUEST)
@@ -99,93 +106,83 @@ class UserViewSet(viewsets.ModelViewSet):
             return Response({'error': 'Email already exists'}, status=status.HTTP_400_BAD_REQUEST)
 
         user = User.objects.create_user(
-            username=username, 
+            username=username,
             email=email,
-            password=password, 
+            password=password,
             role=role
         )
-        
-        # Log the action
+
         log_action(
             request.user,
-            "ADD",
-            user.id,
-            f"Created user {username} with role {role}"
+            "add",
+            f"Created user {username} with role {role}",
+            ip_address=request.META.get('REMOTE_ADDR')
         )
 
         serializer = UserSerializer(user)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
-    # 🟡 Update role (PATCH)
+    # 🟡 Partial update (change role)
     def partial_update(self, request, *args, **kwargs):
         user = self.get_object()
         old_role = user.role
-        role = request.data.get('role')
+        new_role = request.data.get('role')
 
-        if role and role not in VALID_ROLES:
+        if new_role and new_role not in VALID_ROLES:
             return Response({'error': 'Invalid role'}, status=status.HTTP_400_BAD_REQUEST)
 
         serializer = self.get_serializer(user, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
-        
-        if role and role != old_role:
-            # Log role change
+        serializer.save()
+
+        if new_role and new_role != old_role:
             log_action(
                 request.user,
-                "UPDATE",
-                user.id,
-                f"Changed role from {old_role} to {role} for user {user.username}"
+                "update",
+                f"Changed role for {user.username} from {old_role} → {new_role}",
+                ip_address=request.META.get('REMOTE_ADDR')
             )
-        
-        serializer.save()
+
         return Response(serializer.data)
 
     # 🟡 Delete user
     def destroy(self, request, *args, **kwargs):
         user = self.get_object()
-        user_id = user.id
-        username = user.username
-        
-        # Prevent self-deletion
+
         if user == request.user:
-            return Response(
-                {'error': 'You cannot delete your own account'}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        # Log the action before deletion
+            return Response({'error': 'You cannot delete your own account'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        username = user.username
+        user.delete()
+
         log_action(
             request.user,
-            "DELETE",
-            user_id,
-            f"Deleted user {username}"
+            "delete",
+            f"Deleted user {username}",
+            ip_address=request.META.get('REMOTE_ADDR')
         )
-        
-        user.delete()
+
         return Response({'message': 'User deleted successfully'}, status=status.HTTP_204_NO_CONTENT)
 
     # 🟡 List users
     def list(self, request, *args, **kwargs):
-        # Log view action
         log_action(
             request.user,
-            "VIEW",
-            0,
-            "Viewed user list",
-            "User"
+            "view",
+            f"Viewed user list",
+            ip_address=request.META.get('REMOTE_ADDR')
         )
         return super().list(request, *args, **kwargs)
 
     # 🟡 Retrieve single user
     def retrieve(self, request, *args, **kwargs):
-        # Log view action for specific user
         user = self.get_object()
         log_action(
             request.user,
-            "VIEW",
-            user.id,
+            "view",
             f"Viewed details of user {user.username}",
-            "User"
+            ip_address=request.META.get('REMOTE_ADDR')
         )
         return super().retrieve(request, *args, **kwargs)
 
@@ -195,18 +192,16 @@ class UserViewSet(viewsets.ModelViewSet):
 # =========================================================
 class ActivityLogViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = ActivityLogSerializer
-    permission_classes = [IsAdmin]  # Only admins can view activity logs
+    permission_classes = [IsAdmin]
 
     def get_queryset(self):
-        return ActivityLog.objects.all().order_by('-Timestamp')
+        return ActivityLog.objects.all().order_by('-timestamp')
 
     def list(self, request, *args, **kwargs):
-        # Log the view of activity logs
         log_action(
             request.user,
-            "VIEW",
-            0,
-            "Viewed activity logs",
-            "ActivityLog"
+            "view",
+            "Viewed activity log list",
+            ip_address=request.META.get('REMOTE_ADDR')
         )
         return super().list(request, *args, **kwargs)

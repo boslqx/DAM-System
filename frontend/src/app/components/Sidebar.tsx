@@ -2,7 +2,7 @@
 
 import { Box, VStack, IconButton, Tooltip, Text, Avatar } from "@chakra-ui/react";
 import { motion } from "framer-motion";
-import { Home, Upload, Settings, LogOut, Users } from "lucide-react";
+import { Home, Upload, Settings, LogOut, Users, Activity } from "lucide-react"; // ✅ Added Activity icon
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
@@ -78,16 +78,28 @@ export default function Sidebar() {
           <IconButton aria-label="Upload" icon={<Upload />} variant="ghost" onClick={() => goTo("/upload")} />
         </Tooltip>
 
-        {/* 👑 Show this only if Admin */}
+        {/* 👑 Admin Only Section */}
         {role === "Admin" && (
-          <Tooltip label="Manage Users" placement="right">
-            <IconButton
-              aria-label="Manage Users"
-              icon={<Users />}
-              variant="ghost"
-              onClick={() => goTo("/manageuser")}
-            />
-          </Tooltip>
+          <>
+            <Tooltip label="Manage Users" placement="right">
+              <IconButton
+                aria-label="Manage Users"
+                icon={<Users />}
+                variant="ghost"
+                onClick={() => goTo("/manageuser")}
+              />
+            </Tooltip>
+
+            {/* ✅ NEW: Activity Log Tab */}
+            <Tooltip label="Activity Log" placement="right">
+              <IconButton
+                aria-label="Activity Log"
+                icon={<Activity />}
+                variant="ghost"
+                onClick={() => goTo("/activity-log")}
+              />
+            </Tooltip>
+          </>
         )}
 
         <Tooltip label="Settings" placement="right">
