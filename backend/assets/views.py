@@ -23,13 +23,11 @@ class AssetViewSet(viewsets.ModelViewSet):
             permission_classes = [IsViewerOrHigher]  # List & retrieve allowed to all
         return [perm() for perm in permission_classes]
 
-    def log_action(self, user, action_type, table_affected, record_id, description, ip_address):
-        """Helper function to create and save activity logs"""
+    def log_action(self, user, action_type, description, ip_address):
+        """Helper to create activity logs (model has no table_affected/record_id)."""
         ActivityLog.objects.create(
             user=user,
             action_type=action_type,
-            table_affected=table_affected,
-            record_id=record_id,
             description=description,
             ip_address=ip_address,
         )
@@ -166,9 +164,7 @@ class AssetViewSet(viewsets.ModelViewSet):
         self.log_action(
             user=self.request.user,
             action_type="upload",
-            table_affected="Asset",
-            record_id=asset.id,
-            description=f"Uploaded asset '{asset.name}' ({asset.file_type})",
+            description=f"Uploaded asset '{asset.name}' ({asset.file_type}) [id={asset.id}]",
             ip_address=self.request.META.get('REMOTE_ADDR'),
         )
 
@@ -181,9 +177,7 @@ class AssetViewSet(viewsets.ModelViewSet):
         self.log_action(
             user=self.request.user,
             action_type="update",
-            table_affected="Asset",
-            record_id=asset.id,
-            description=f"Updated asset '{asset.name}' ({asset.file_type})",
+            description=f"Updated asset '{asset.name}' ({asset.file_type}) [id={asset.id}]",
             ip_address=self.request.META.get('REMOTE_ADDR'),
         )
 
@@ -200,9 +194,7 @@ class AssetViewSet(viewsets.ModelViewSet):
         self.log_action(
             user=self.request.user,
             action_type="delete",
-            table_affected="Asset",
-            record_id=asset_id,
-            description=f"Deleted asset '{asset_name}' ({asset_file_type})",
+            description=f"Deleted asset '{asset_name}' ({asset_file_type}) [id={asset_id}]",
             ip_address=self.request.META.get('REMOTE_ADDR'),
         )
 
