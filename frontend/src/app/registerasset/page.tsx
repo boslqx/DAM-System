@@ -223,11 +223,9 @@ export default function RegisterAssetPage() {
       fileFormData.append('is_public', formData.is_public.toString());
       fileFormData.append('keywords', formData.keywords || '');
       
-      // Send tags as individual array items
+      // Send tags as repeated form fields: tags[]
       if (tagsArray.length > 0) {
-        fileFormData.append('tags', JSON.stringify(tagsArray)); // send as JSON array
-      } else {
-        fileFormData.append('tags', '[]');
+        tagsArray.forEach((tag) => fileFormData.append('tags[]', tag));
       }
 
       console.log("Uploading to:", "http://127.0.0.1:8000/api/assets/");

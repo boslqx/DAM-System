@@ -81,43 +81,85 @@ class AssetViewSet(viewsets.ModelViewSet):
             
             # Make a mutable copy of the data
             data = request.data.copy()
-            
-            # Handle tags sent as tags[] array from FormData
+
+            # Normalize tags from either tags[] (repeated form fields),
+            # JSON string in tags, or comma-separated string in tags
+            normalized_tags: list[str] = []
             if 'tags[]' in request.data:
-                # getlist returns all values for keys ending with []
-                tags_list = request.data.getlist('tags[]')
-                data['tags'] = tags_list
-                print("Tags extracted from tags[]:", tags_list)
-                print("Tags type:", type(tags_list))
-            # Handle regular tags field
+                # Multiple fields like tags[]=a, tags[]=b
+                normalized_tags = request.data.getlist('tags[]')
+                print("Tags extracted from tags[]:", normalized_tags)
             elif 'tags' in data:
-                tags_value = data.get('tags')
-                print("Tags value received:", tags_value, "Type:", type(tags_value))
-                
-                if isinstance(tags_value, str):
-                    if not tags_value.strip():
-                        data['tags'] = []
+                raw_tags = data.get('tags')
+                print("Tags value received:", raw_tags, "Type:", type(raw_tags))
+                if isinstance(raw_tags, list):
+                    normalized_tags = raw_tags
+                elif isinstance(raw_tags, str):
+                    raw_tags_str = raw_tags.strip()
+                    if not raw_tags_str:
+                        normalized_tags = []
                     else:
+                        # Try JSON array first, otherwise treat as comma-separated
                         try:
-                            parsed = json.loads(tags_value)
+                            parsed = json.loads(raw_tags_str)
                             if isinstance(parsed, list):
-                                data['tags'] = parsed
+                                normalized_tags = parsed
                             else:
-                                data['tags'] = []
+                                normalized_tags = []
                         except (json.JSONDecodeError, ValueError):
-                            data['tags'] = [tag.strip() for tag in tags_value.split(',') if tag.strip()]
-                elif isinstance(tags_value, list):
-                    data['tags'] = tags_value
+                            normalized_tags = [part.strip() for part in raw_tags_str.split(',') if part.strip()]
                 else:
-                    data['tags'] = []
+                    normalized_tags = []
             else:
-                data['tags'] = []
                 print("No tags provided")
-            
-            print("Final tags to be saved:", data.get('tags'))
-            print("Final tags type:", type(data.get('tags')))
-            
-            serializer = self.get_serializer(data=data, context={'request': request})
+                normalized_tags = []
+
+            # Force all tags to strings to satisfy serializer CharField child
+            normalized_tags = [str(tag) for tag in normalized_tags]
+
+            # Build a clean payload dict rather than passing a QueryDict,
+            # to avoid QueryDict coercion of list values into strings
+            def _to_bool(value):
+                if isinstance(value, bool):
+                    return value
+                if value is None:
+                    return False
+                return str(value).lower() in ("1", "true", "yes", "on")
+
+            def _to_int(value, default=0):
+                try:
+                    return int(value)
+                except (TypeError, ValueError):
+                    return default
+
+            payload = {
+                'file': request.FILES.get('file'),
+                'name': data.get('name') or '',
+                'description': data.get('description') or '',
+                'file_type': data.get('file_type') or '',
+                'file_size': _to_int(data.get('file_size'), 0),
+                'tags': normalized_tags,
+                'keywords': data.get('keywords') or '',
+                'category': data.get('category') or '',
+                'is_public': _to_bool(data.get('is_public', True)),
+            }
+
+            # Optional fields if present
+            if 'preview_url' in data:
+                payload['preview_url'] = data.get('preview_url')
+            if 'polygon_count' in data:
+                payload['polygon_count'] = _to_int(data.get('polygon_count'), None)
+            if 'dimensions' in data:
+                try:
+                    dims = data.get('dimensions')
+                    payload['dimensions'] = json.loads(dims) if isinstance(dims, str) else dims
+                except (json.JSONDecodeError, TypeError, ValueError):
+                    payload['dimensions'] = None
+
+            print("Final tags to be saved:", payload.get('tags'))
+            print("Final tags type:", type(payload.get('tags')))
+
+            serializer = self.get_serializer(data=payload, context={'request': request})
             
             if not serializer.is_valid():
                 print("❌ Validation errors:", serializer.errors)
