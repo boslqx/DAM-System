@@ -13,6 +13,7 @@ import {
 } from "@chakra-ui/react";
 import { useState } from "react";
 import axios from "axios";
+import { apiUrl } from "@/lib/api";
 import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
@@ -25,7 +26,7 @@ export default function LoginPage() {
     e.preventDefault();
 
     try {
-      const res = await axios.post("http://127.0.0.1:8000/api/auth/login/", {
+      const res = await axios.post(apiUrl("/api/auth/login/"), {
         username,   // send username instead of email
         password,
       });

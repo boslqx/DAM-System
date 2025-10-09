@@ -26,6 +26,7 @@ import { Worker, Viewer } from "@react-pdf-viewer/core";
 import "@react-pdf-viewer/core/lib/styles/index.css";
 import "@react-pdf-viewer/default-layout/lib/styles/index.css";
 import Sidebar from "@/components/Sidebar";
+import { apiUrl, fileUrl } from "@/lib/api";
 import { useRouter } from "next/navigation";
 
 // Lazy load Babylon viewer for better performance
@@ -72,7 +73,7 @@ export default function Dashboard() {
       return;
     }
 
-    fetch("http://127.0.0.1:8000/api/assets/", {
+    fetch(apiUrl("/api/assets/"), {
       headers: {
         Authorization: `Token ${token}`,
       },
@@ -93,7 +94,7 @@ export default function Dashboard() {
         setAssets([]);
         setLoading(false);
       });
-  }, []);
+  }, [router]);
 
   // 🔹 File upload handler (your existing one is fine!)
   const onDrop = useCallback(
@@ -121,7 +122,7 @@ export default function Dashboard() {
 
       formData.append("file_type", detectedType);
 
-      const res = await fetch("http://127.0.0.1:8000/api/assets/", {
+      const res = await fetch(apiUrl("/api/assets/"), {
         method: "POST",
         body: formData,
         headers: {
@@ -143,7 +144,7 @@ export default function Dashboard() {
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
-    accept: { "*/*": [] },
+    // accept removed to prevent invalid MIME pattern warning; allow all
   });
 
   // Helper function to get file extension
@@ -179,12 +180,7 @@ export default function Dashboard() {
   };
 
   // Get full file URL (handles relative URLs from Django)
-  const getFullFileUrl = (fileUrl: string): string => {
-    if (fileUrl.startsWith('http')) {
-      return fileUrl;
-    }
-    return `http://127.0.0.1:8000${fileUrl}`;
-  };
+  const getFullFileUrl = (url: string): string => fileUrl(url);
 
   if (!role) {
     return (

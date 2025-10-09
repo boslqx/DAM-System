@@ -29,7 +29,9 @@ import {
   CardBody,
 } from "@chakra-ui/react";
 import Sidebar from "@/components/Sidebar";
+import { apiUrl } from "@/lib/api";
 import { DownloadIcon, ChevronLeftIcon, ChevronRightIcon } from "@chakra-ui/icons";
+import type { ChartData } from 'chart.js';
 
 // Chart.js imports
 import {
@@ -100,7 +102,7 @@ export default function ActivityLogPage() {
   const totalPages = Math.ceil(logs.length / logsPerPage);
 
   // Chart data state
-  const [chartData, setChartData] = useState<any>(null);
+  const [chartData, setChartData] = useState<ChartData<'bar', number[], string> | null>(null);
 
   const getToken = (): string | null => {
     if (typeof window !== "undefined") {
@@ -110,7 +112,7 @@ export default function ActivityLogPage() {
   };
 
   // Function to process data for chart
-  const processChartData = (logs: ActivityLog[]) => {
+  const processChartData = (logs: ActivityLog[]): ChartData<'bar', number[], string> => {
     const actionCounts: { [key: string]: number } = {};
     
     // Count occurrences of each action type
@@ -199,7 +201,7 @@ export default function ActivityLogPage() {
       params.append('page_size', '20');
       
       const queryString = params.toString();
-      const url = `http://127.0.0.1:8000/api/activity/logs/${queryString ? `?${queryString}` : ''}`;
+      const url = apiUrl(`/api/activity/logs/${queryString ? `?${queryString}` : ''}`);
 
       const res = await fetch(url, {
         headers: {
@@ -252,8 +254,9 @@ export default function ActivityLogPage() {
 
       // Process chart data after setting logs
       setChartData(processChartData(logsData));
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -327,7 +330,7 @@ export default function ActivityLogPage() {
       params.append('page_size', '10000');
       
       const queryString = params.toString();
-      const url = `http://127.0.0.1:8000/api/activity/logs/${queryString ? `?${queryString}` : ''}`;
+      const url = apiUrl(`/api/activity/logs/${queryString ? `?${queryString}` : ''}`);
 
       const res = await fetch(url, {
         headers: {
@@ -370,8 +373,9 @@ export default function ActivityLogPage() {
       a.click();
       document.body.removeChild(a);
       window.URL.revokeObjectURL(urlObj);
-    } catch (err: any) {
-      setError(`Export failed: ${err.message}`);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      setError(`Export failed: ${message}`);
     }
   };
 

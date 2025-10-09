@@ -33,8 +33,9 @@ import {
   FormLabel,
   HStack,
 } from "@chakra-ui/react";
-import { DeleteIcon, EditIcon, ChevronLeftIcon, ChevronRightIcon } from "@chakra-ui/icons";
+import { DeleteIcon, ChevronLeftIcon, ChevronRightIcon } from "@chakra-ui/icons";
 import Sidebar from "@/components/Sidebar";
+import { apiUrl } from "@/lib/api";
 import { useRouter } from "next/navigation";
 
 
@@ -112,7 +113,7 @@ export default function ManageUserPage() {
       setError(null);
       const token = getToken();
       
-      const res = await fetch("http://127.0.0.1:8000/api/users/", {
+      const res = await fetch(apiUrl("/api/users/"), {
         headers: {
           Authorization: `Token ${token}`,
         },
@@ -132,11 +133,12 @@ export default function ManageUserPage() {
       setUsers(data);
       setAllUsers(data); // Store all users for search filtering
       setCurrentPage(1); // Reset to first page on fetch
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      setError(message);
       toast({
         title: "Error loading users",
-        description: err.message,
+        description: message,
         status: "error",
         duration: 4000,
         isClosable: true,
@@ -156,7 +158,7 @@ export default function ManageUserPage() {
       setUpdatingUserId(userId);
       const token = getToken();
       
-      const res = await fetch(`http://127.0.0.1:8000/api/users/${userId}/`, {
+      const res = await fetch(apiUrl(`/api/users/${userId}/`), {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -193,10 +195,11 @@ export default function ManageUserPage() {
           user.id === userId ? { ...user, role: newRole as User['role'] } : user
         )
       );
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
       toast({
         title: "Error updating role",
-        description: err.message,
+        description: message,
         status: "error",
         duration: 4000,
         isClosable: true,
@@ -216,7 +219,7 @@ export default function ManageUserPage() {
       setDeletingUserId(userId);
       const token = getToken();
       
-      const res = await fetch(`http://127.0.0.1:8000/api/users/${userId}/`, {
+      const res = await fetch(apiUrl(`/api/users/${userId}/`), {
         method: "DELETE",
         headers: { Authorization: `Token ${token}` },
       });
@@ -248,10 +251,11 @@ export default function ManageUserPage() {
       if (currentPage > newTotalPages && newTotalPages > 0) {
         setCurrentPage(newTotalPages);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
       toast({
         title: "Error deleting user",
-        description: err.message,
+        description: message,
         status: "error",
         duration: 4000,
         isClosable: true,
@@ -269,7 +273,7 @@ export default function ManageUserPage() {
       setCreatingUser(true);
       const token = getToken();
       
-      const res = await fetch("http://127.0.0.1:8000/api/users/", {
+      const res = await fetch(apiUrl("/api/users/"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -301,10 +305,11 @@ export default function ManageUserPage() {
       setIsOpen(false);
       fetchUsers(); // Refresh the list
       setNewUser({ username: "", email: "", password: "", role: "Viewer" });
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
       toast({
         title: "Error creating user",
-        description: err.message,
+        description: message,
         status: "error",
         duration: 4000,
         isClosable: true,

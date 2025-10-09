@@ -1,12 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { apiUrl } from "@/lib/api";
+
+type HomeAsset = { id: number; name: string; description?: string; file: string };
 
 export default function Home() {
-  const [assets, setAssets] = useState<any[]>([]);
+  const [assets, setAssets] = useState<HomeAsset[]>([]);
 
   useEffect(() => {
-    fetch("http://127.0.0.1:8000/api/assets/")
+    fetch(apiUrl("/api/assets/"))
       .then((res) => res.json())
       .then((data) => setAssets(data));
   }, []);

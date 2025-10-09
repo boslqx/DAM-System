@@ -27,6 +27,7 @@ import {
 } from "@chakra-ui/react";
 import { FiUpload, FiFile, FiImage, FiVideo, FiBox } from "react-icons/fi";
 import Sidebar from "@/components/Sidebar";
+import { apiUrl } from "@/lib/api";
 
 type AssetFormData = {
   name: string;
@@ -230,13 +231,13 @@ export default function RegisterAssetPage() {
         fileFormData.append('tags', '[]');
       }
 
-      console.log("Uploading to:", "http://127.0.0.1:8000/api/assets/");
+      console.log("Uploading to:", apiUrl("/api/assets/"));
       console.log("=== FormData Contents ===");
-      for (let pair of fileFormData.entries()) {
+      for (const pair of fileFormData.entries()) {
         console.log(pair[0], ':', pair[1]);
       }
 
-      const res = await fetch("http://127.0.0.1:8000/api/assets/", {
+      const res = await fetch(apiUrl("/api/assets/"), {
         method: "POST",
         headers: {
           Authorization: `Token ${token}`,
@@ -290,12 +291,12 @@ export default function RegisterAssetPage() {
         router.push("/dashboard");
       }, 1500);
 
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Upload error:", err);
-      
+      const message = err instanceof Error ? err.message : 'Unknown error';
       toast({
         title: "Upload failed",
-        description: err.message || "Please try again",
+        description: message || "Please try again",
         status: "error",
         duration: 5000,
         isClosable: true,
@@ -326,7 +327,7 @@ export default function RegisterAssetPage() {
                 display="none"
                 id="file-upload"
                 onChange={handleFileSelect}
-                accept="*/*"
+                // accept removed to prevent invalid MIME pattern warning
               />
               <Box
                 as="label"
