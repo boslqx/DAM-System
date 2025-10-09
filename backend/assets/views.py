@@ -86,7 +86,16 @@ class AssetViewSet(viewsets.ModelViewSet):
             if 'tags[]' in request.data:
                 # getlist returns all values for keys ending with []
                 tags_list = request.data.getlist('tags[]')
-                data['tags'] = tags_list
+                # Ensure the mutable QueryDict stores a proper multi-value list for 'tags'
+                if hasattr(data, 'setlist'):
+                    data.setlist('tags', tags_list)
+                else:
+                    data['tags'] = list(tags_list)
+                # Remove the raw tags[] entries to avoid confusion downstream
+                try:
+                    del data['tags[]']
+                except Exception:
+                    pass
                 print("Tags extracted from tags[]:", tags_list)
                 print("Tags type:", type(tags_list))
             # Handle regular tags field
@@ -107,7 +116,8 @@ class AssetViewSet(viewsets.ModelViewSet):
                         except (json.JSONDecodeError, ValueError):
                             data['tags'] = [tag.strip() for tag in tags_value.split(',') if tag.strip()]
                 elif isinstance(tags_value, list):
-                    data['tags'] = tags_value
+                    # Ensure all list elements are strings
+                    data['tags'] = [str(tag) for tag in tags_value]
                 else:
                     data['tags'] = []
             else:
