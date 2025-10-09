@@ -1,5 +1,7 @@
 "use client";
 import { useEffect, useRef } from "react";
+import "@babylonjs/loaders";
+
 
 export default function BabylonViewer({ modelUrl }: { modelUrl: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
