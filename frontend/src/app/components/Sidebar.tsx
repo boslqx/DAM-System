@@ -6,7 +6,8 @@ import { Home, Upload, Settings, LogOut, Users, Activity } from "lucide-react"; 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
-const MotionBox = motion(Box);
+// framer-motion v11 deprecates factory call; use create()
+const MotionBox = motion.create(Box);
 
 export default function Sidebar() {
   const [isOpen, setIsOpen] = useState(false);

@@ -223,11 +223,9 @@ export default function RegisterAssetPage() {
       fileFormData.append('is_public', formData.is_public.toString());
       fileFormData.append('keywords', formData.keywords || '');
       
-      // Send tags as individual array items
+      // Send tags as individual array items expected by the API
       if (tagsArray.length > 0) {
-        fileFormData.append('tags', JSON.stringify(tagsArray)); // send as JSON array
-      } else {
-        fileFormData.append('tags', '[]');
+        tagsArray.forEach((tag) => fileFormData.append('tags[]', tag));
       }
 
       console.log("Uploading to:", "http://127.0.0.1:8000/api/assets/");
@@ -244,26 +242,29 @@ export default function RegisterAssetPage() {
         body: fileFormData,
       });
 
-      const responseText = await res.text();
-      console.log("Response status:", res.status);
-      console.log("Response text:", responseText);
-
-      let data;
-      try {
-        data = JSON.parse(responseText);
-      } catch (parseError) {
-        console.error("Failed to parse response as JSON:", parseError);
-        if (responseText.includes('<!DOCTYPE') || responseText.includes('<html')) {
-          throw new Error("Server returned an HTML error page. Check if the API endpoint is correct.");
-        } else {
-          throw new Error(`Server returned unexpected response: ${responseText.substring(0, 100)}...`);
+      let data: any = null;
+      const contentType = res.headers.get("content-type") || "";
+      if (contentType.includes("application/json")) {
+        data = await res.json();
+      } else {
+        const responseText = await res.text();
+        console.log("Response status:", res.status);
+        console.log("Response text:", responseText);
+        try {
+          data = JSON.parse(responseText);
+        } catch {
+          data = { message: responseText };
         }
       }
 
       if (!res.ok) {
-        console.error("=== VALIDATION ERROR ===");
-        console.error("Full response:", JSON.stringify(data, null, 2));
-        throw new Error(data.detail || data.error || data.message || `HTTP error! status: ${res.status}`);
+        const details = data?.details;
+        const firstError = details
+          ? Object.entries(details)
+              .map(([field, msgs]: any) => `${field}: ${Array.isArray(msgs) ? msgs.join(', ') : JSON.stringify(msgs)}`)
+              .join('\n')
+          : (data?.detail || data?.error || data?.message || `HTTP error! status: ${res.status}`);
+        throw new Error(firstError);
       }
 
       toast({
