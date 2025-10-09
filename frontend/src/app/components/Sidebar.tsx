@@ -6,7 +6,8 @@ import { Home, Upload, Settings, LogOut, Users, Activity } from "lucide-react"; 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
-const MotionBox = motion(Box);
+// framer-motion v11 deprecates factory call; use create()
+const MotionBox = motion.create(Box);
 
 export default function Sidebar() {
   const [isOpen, setIsOpen] = useState(false);
@@ -75,7 +76,7 @@ export default function Sidebar() {
         </Tooltip>
 
         <Tooltip label="Upload" placement="right">
-          <IconButton aria-label="Upload" icon={<Upload />} variant="ghost" onClick={() => goTo("/upload")} />
+          <IconButton aria-label="Upload" icon={<Upload />} variant="ghost" onClick={() => goTo("/registerasset")} />
         </Tooltip>
 
         {/* 👑 Admin Only Section */}
