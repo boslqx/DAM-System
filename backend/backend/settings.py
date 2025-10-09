@@ -144,10 +144,6 @@ import os
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
-# File upload settings
-FILE_UPLOAD_MAX_MEMORY_SIZE = 104857600  # 100MB
-DATA_UPLOAD_MAX_MEMORY_SIZE = 104857600  
-
 AUTH_USER_MODEL = 'users.User'
 
 REST_FRAMEWORK = {
