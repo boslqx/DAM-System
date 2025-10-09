@@ -311,17 +311,17 @@ export default function RegisterAssetPage() {
   return (
     <Flex>
       <Sidebar />
-      <Box flex="1" p={8} bg="gray.50" minH="100vh" ml={{ base: "0", md: "60px" }}>
+      <Box flex="1" p={8} bg="brand.50" minH="100vh" ml={{ base: "0", md: "60px" }}>
         <Heading mb={6} color="gray.700">Register New Asset</Heading>
         
         <Grid templateColumns={{ base: "1fr", lg: "1fr 400px" }} gap={6}>
           {/* Left Column - Form */}
-          <Box bg="white" p={6} borderRadius="xl" boxShadow="sm">
+          <Box bg="white" p={6} borderRadius="xl" boxShadow="sm" border="1px" borderColor="brand.100">
             <Heading size="md" mb={4} color="gray.700">Asset Information</Heading>
             
             {/* File Upload Area */}
             <Box mb={4}>
-              <FormLabel>Upload File</FormLabel>
+              <FormLabel color="gray.700">Upload File</FormLabel>
               <Input
                 type="file"
                 display="none"
@@ -334,12 +334,17 @@ export default function RegisterAssetPage() {
                 htmlFor="file-upload"
                 p={12}
                 border="2px dashed"
-                borderColor={selectedFile ? "green.400" : "gray.300"}
+                borderColor={selectedFile ? "green.400" : "brand.200"}
                 borderRadius="md"
                 textAlign="center"
                 cursor="pointer"
-                bg={selectedFile ? "green.50" : "gray.50"}
-                _hover={{ bg: selectedFile ? "green.100" : "gray.100", borderColor: "blue.400" }}
+                bg={selectedFile ? "green.50" : "brand.50"}
+                _hover={{ 
+                  bg: selectedFile ? "green.100" : "brand.100", 
+                  borderColor: "brand.300",
+                  transform: "translateY(-2px)",
+                  transition: "all 0.2s"
+                }}
                 onDrop={handleDrop}
                 onDragOver={(e: React.DragEvent) => {
                   e.preventDefault(); // Only prevent default for dragOver
@@ -348,6 +353,7 @@ export default function RegisterAssetPage() {
                 flexDirection="column"
                 justifyContent="center"
                 minH="200px"
+                transition="all 0.2s"
               >
                 {previewUrl ? (
                   <VStack>
@@ -380,9 +386,9 @@ export default function RegisterAssetPage() {
                   </VStack>
                 ) : (
                   <VStack spacing={3}>
-                    <Icon as={FiUpload} w={12} h={12} color="gray.400" />
+                    <Icon as={FiUpload} w={12} h={12} color="brand.200" />
                     <VStack spacing={1}>
-                      <Text color="gray.600" fontWeight="medium">
+                      <Text color="gray.700" fontWeight="medium">
                         Click to upload or drag and drop
                       </Text>
                       <Text fontSize="sm" color="gray.500">
@@ -396,11 +402,14 @@ export default function RegisterAssetPage() {
 
             {/* Category Dropdown */}
             <FormControl mb={4}>
-              <FormLabel>Category</FormLabel>
+              <FormLabel color="gray.700">Category</FormLabel>
               <Select
                 placeholder="Select a category"
                 value={formData.category}
                 onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                borderColor="brand.100"
+                _hover={{ borderColor: "brand.200" }}
+                _focus={{ borderColor: "brand.200", boxShadow: "0 0 0 1px var(--chakra-colors-brand-200)" }}
               >
                 <option value="3D Models">3D Models</option>
                 <option value="Images">Images</option>
@@ -412,65 +421,82 @@ export default function RegisterAssetPage() {
 
             {/* Asset Name */}
             <FormControl mb={4} isRequired>
-              <FormLabel>Asset Name</FormLabel>
+              <FormLabel color="gray.700">Asset Name</FormLabel>
               <Input
                 placeholder="e.g. Product Mockup, Logo Design"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                borderColor="brand.100"
+                _hover={{ borderColor: "brand.200" }}
+                _focus={{ borderColor: "brand.200", boxShadow: "0 0 0 1px var(--chakra-colors-brand-200)" }}
               />
             </FormControl>
 
             {/* Description */}
             <FormControl mb={4}>
-              <FormLabel>Description</FormLabel>
+              <FormLabel color="gray.700">Description</FormLabel>
               <Textarea
                 placeholder="Brief description of the asset..."
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 rows={4}
+                borderColor="brand.100"
+                _hover={{ borderColor: "brand.200" }}
+                _focus={{ borderColor: "brand.200", boxShadow: "0 0 0 1px var(--chakra-colors-brand-200)" }}
               />
             </FormControl>
 
             {/* Tags */}
             <FormControl mb={4}>
-              <FormLabel>Tags</FormLabel>
+              <FormLabel color="gray.700">Tags</FormLabel>
               <Input
                 placeholder="e.g. design, mockup, product (comma-separated)"
                 value={formData.tags}
                 onChange={(e) => setFormData({ ...formData, tags: e.target.value })}
+                borderColor="brand.100"
+                _hover={{ borderColor: "brand.200" }}
+                _focus={{ borderColor: "brand.200", boxShadow: "0 0 0 1px var(--chakra-colors-brand-200)" }}
               />
-              <FormHelperText>Separate tags with commas</FormHelperText>
+              <FormHelperText color="gray.500">Separate tags with commas</FormHelperText>
             </FormControl>
 
             {/* Keywords */}
             <FormControl mb={4}>
-              <FormLabel>Keywords</FormLabel>
+              <FormLabel color="gray.700">Keywords</FormLabel>
               <Input
                 placeholder="Search keywords..."
                 value={formData.keywords}
                 onChange={(e) => setFormData({ ...formData, keywords: e.target.value })}
+                borderColor="brand.100"
+                _hover={{ borderColor: "brand.200" }}
+                _focus={{ borderColor: "brand.200", boxShadow: "0 0 0 1px var(--chakra-colors-brand-200)" }}
               />
             </FormControl>
 
             {/* Public/Private Toggle */}
             <FormControl display="flex" alignItems="center" mb={6}>
-              <FormLabel mb="0">Make Public</FormLabel>
+              <FormLabel mb="0" color="gray.700">Make Public</FormLabel>
               <Switch
                 isChecked={formData.is_public}
                 onChange={(e) => setFormData({ ...formData, is_public: e.target.checked })}
+                colorScheme="brand"
               />
             </FormControl>
 
             {/* Action Buttons */}
             <Flex gap={3}>
               <Button
-                colorScheme="blue"
+                colorScheme="brand"
                 leftIcon={<Icon as={FiUpload} />}
                 onClick={handleUpload}
                 isLoading={uploading}
                 loadingText="Uploading..."
                 flex="1"
                 isDisabled={!selectedFile}
+                bg="brand.200"
+                color="white"
+                _hover={{ bg: "brand.300" }}
+                _active={{ bg: "brand.200" }}
               >
                 Save Asset
               </Button>
@@ -489,6 +515,8 @@ export default function RegisterAssetPage() {
                     is_public: true,
                   });
                 }}
+                borderColor="brand.100"
+                _hover={{ bg: "brand.50", borderColor: "brand.200" }}
               >
                 Clear
               </Button>
@@ -496,13 +524,13 @@ export default function RegisterAssetPage() {
           </Box>
 
           {/* Right Column - Preview/Info */}
-          <Box bg="white" p={6} borderRadius="xl" boxShadow="sm" height="fit-content">
+          <Box bg="white" p={6} borderRadius="xl" boxShadow="sm" height="fit-content" border="1px" borderColor="brand.100">
             <Heading size="md" mb={4} color="gray.700">File Information</Heading>
             {selectedFile ? (
               <VStack align="stretch" spacing={4}>
                 <Flex justify="space-between" align="center">
                   <Text color="gray.600">File Name:</Text>
-                  <Text fontWeight="medium" maxW="200px" isTruncated>
+                  <Text fontWeight="medium" maxW="200px" isTruncated color="gray.700">
                     {selectedFile.name}
                   </Text>
                 </Flex>
@@ -516,23 +544,23 @@ export default function RegisterAssetPage() {
                 
                 <Flex justify="space-between">
                   <Text color="gray.600">Size:</Text>
-                  <Text>{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</Text>
+                  <Text color="gray.700">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</Text>
                 </Flex>
                 
                 <Flex justify="space-between">
                   <Text color="gray.600">MIME Type:</Text>
-                  <Text fontSize="sm" fontFamily="mono">
+                  <Text fontSize="sm" fontFamily="mono" color="gray.700">
                     {selectedFile.type || "unknown"}
                   </Text>
                 </Flex>
                 
-                <Divider />
+                <Divider borderColor="brand.100" />
                 
                 <Box>
                   <Text color="gray.600" mb={2}>Supported 3D Formats:</Text>
                   <HStack spacing={2} flexWrap="wrap">
                     {['GLB', 'GLTF', 'OBJ', 'FBX', 'STL'].map(format => (
-                      <Badge key={format} colorScheme="purple" variant="subtle">
+                      <Badge key={format} colorScheme="purple" variant="subtle" bg="brand.50" color="brand.200">
                         {format}
                       </Badge>
                     ))}
@@ -541,7 +569,7 @@ export default function RegisterAssetPage() {
               </VStack>
             ) : (
               <VStack spacing={4} py={8}>
-                <Icon as={FiFile} w={12} h={12} color="gray.300" />
+                <Icon as={FiFile} w={12} h={12} color="brand.100" />
                 <Text color="gray.500" textAlign="center">
                   No file selected
                 </Text>

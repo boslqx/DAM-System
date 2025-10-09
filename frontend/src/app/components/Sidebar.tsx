@@ -76,7 +76,7 @@ export default function Sidebar() {
         </Tooltip>
 
         <Tooltip label="Upload" placement="right">
-          <IconButton aria-label="Upload" icon={<Upload />} variant="ghost" onClick={() => goTo("/upload")} />
+          <IconButton aria-label="Upload" icon={<Upload />} variant="ghost" onClick={() => goTo("/registerasset")} />
         </Tooltip>
 
         {/* 👑 Admin Only Section */}
