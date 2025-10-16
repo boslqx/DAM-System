@@ -23,13 +23,11 @@ class AssetViewSet(viewsets.ModelViewSet):
             permission_classes = [IsViewerOrHigher]  # List & retrieve allowed to all
         return [perm() for perm in permission_classes]
 
-    def log_action(self, user, action_type, table_affected, record_id, description, ip_address):
-        """Helper function to create and save activity logs"""
+    def log_action(self, user, action_type, description, ip_address):
+        """Helper to create activity logs (model has no table_affected/record_id)."""
         ActivityLog.objects.create(
             user=user,
             action_type=action_type,
-            table_affected=table_affected,
-            record_id=record_id,
             description=description,
             ip_address=ip_address,
         )
@@ -86,7 +84,16 @@ class AssetViewSet(viewsets.ModelViewSet):
             if 'tags[]' in request.data:
                 # getlist returns all values for keys ending with []
                 tags_list = request.data.getlist('tags[]')
-                data['tags'] = tags_list
+                # Ensure the mutable QueryDict stores a proper multi-value list for 'tags'
+                if hasattr(data, 'setlist'):
+                    data.setlist('tags', tags_list)
+                else:
+                    data['tags'] = list(tags_list)
+                # Remove the raw tags[] entries to avoid confusion downstream
+                try:
+                    del data['tags[]']
+                except Exception:
+                    pass
                 print("Tags extracted from tags[]:", tags_list)
                 print("Tags type:", type(tags_list))
             # Handle regular tags field
@@ -107,7 +114,8 @@ class AssetViewSet(viewsets.ModelViewSet):
                         except (json.JSONDecodeError, ValueError):
                             data['tags'] = [tag.strip() for tag in tags_value.split(',') if tag.strip()]
                 elif isinstance(tags_value, list):
-                    data['tags'] = tags_value
+                    # Ensure all list elements are strings
+                    data['tags'] = [str(tag) for tag in tags_value]
                 else:
                     data['tags'] = []
             else:
@@ -156,9 +164,7 @@ class AssetViewSet(viewsets.ModelViewSet):
         self.log_action(
             user=self.request.user,
             action_type="upload",
-            table_affected="Asset",
-            record_id=asset.id,
-            description=f"Uploaded asset '{asset.name}' ({asset.file_type})",
+            description=f"Uploaded asset '{asset.name}' ({asset.file_type}) [id={asset.id}]",
             ip_address=self.request.META.get('REMOTE_ADDR'),
         )
 
@@ -171,9 +177,7 @@ class AssetViewSet(viewsets.ModelViewSet):
         self.log_action(
             user=self.request.user,
             action_type="update",
-            table_affected="Asset",
-            record_id=asset.id,
-            description=f"Updated asset '{asset.name}' ({asset.file_type})",
+            description=f"Updated asset '{asset.name}' ({asset.file_type}) [id={asset.id}]",
             ip_address=self.request.META.get('REMOTE_ADDR'),
         )
 
@@ -190,9 +194,7 @@ class AssetViewSet(viewsets.ModelViewSet):
         self.log_action(
             user=self.request.user,
             action_type="delete",
-            table_affected="Asset",
-            record_id=asset_id,
-            description=f"Deleted asset '{asset_name}' ({asset_file_type})",
+            description=f"Deleted asset '{asset_name}' ({asset_file_type}) [id={asset_id}]",
             ip_address=self.request.META.get('REMOTE_ADDR'),
         )
 
