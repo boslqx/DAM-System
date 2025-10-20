@@ -15,12 +15,15 @@ class AssetViewSet(viewsets.ModelViewSet):
     parser_classes = [MultiPartParser, FormParser]  # Important for file uploads!
     
     def get_permissions(self):
-        if self.action in ['create', 'update', 'partial_update']:
+        if self.action in ['list', 'retrieve']:
+            # Allow anyone to view assets (for testing)
+            permission_classes = []
+        elif self.action in ['create', 'update', 'partial_update']:
             permission_classes = [IsEditorOrAdmin]  # Editor & Admin
         elif self.action in ['destroy']:
             permission_classes = [IsAdmin]  # Only Admin can delete
         else:
-            permission_classes = [IsViewerOrHigher]  # List & retrieve allowed to all
+            permission_classes = [IsViewerOrHigher]
         return [perm() for perm in permission_classes]
 
     def log_action(self, user, action_type, description, ip_address):
