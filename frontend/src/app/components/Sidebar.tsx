@@ -2,7 +2,7 @@
 
 import { Box, VStack, IconButton, Tooltip, Text, Avatar } from "@chakra-ui/react";
 import { motion } from "framer-motion";
-import { Home, Upload, Settings, LogOut, Users, Activity } from "lucide-react"; // ✅ Added Activity icon
+import { Home, Upload, Settings, LogOut, Users, Activity, Star } from "lucide-react"; // ✅ Added Star icon
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
@@ -75,6 +75,16 @@ export default function Sidebar() {
           <IconButton aria-label="Dashboard" icon={<Home />} variant="ghost" onClick={() => goTo("/dashboard")} />
         </Tooltip>
 
+        {/* ✅ NEW: My Favorites Tab - Available for all roles */}
+        <Tooltip label="My Favorites" placement="right">
+          <IconButton
+            aria-label="My Favorites"
+            icon={<Star />}
+            variant="ghost"
+            onClick={() => goTo("/favorites")}
+          />
+        </Tooltip>
+
         <Tooltip label="Upload" placement="right">
           <IconButton aria-label="Upload" icon={<Upload />} variant="ghost" onClick={() => goTo("/registerasset")} />
         </Tooltip>
@@ -91,7 +101,7 @@ export default function Sidebar() {
               />
             </Tooltip>
 
-            {/* ✅ NEW: Activity Log Tab */}
+            {/* ✅ Activity Log Tab */}
             <Tooltip label="Activity Log" placement="right">
               <IconButton
                 aria-label="Activity Log"

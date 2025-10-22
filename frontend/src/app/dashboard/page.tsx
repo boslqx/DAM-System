@@ -31,11 +31,13 @@ import "@react-pdf-viewer/core/lib/styles/index.css";
 import "@react-pdf-viewer/default-layout/lib/styles/index.css";
 import Sidebar from "@/components/Sidebar";
 import { useRouter } from "next/navigation";
-import { EditIcon, DownloadIcon } from "@chakra-ui/icons";
+import { EditIcon, DownloadIcon,StarIcon } from "@chakra-ui/icons";
+
 
 // Import new components
 import AssetFilters from "@/components/AssetFilters";
 import EditAssetModal from "@/components/EditAssetModal";
+import FavoriteButton from "@/components/FavoriteButton";
 
 // Lazy load Babylon viewer for better performance
 const BabylonViewer = lazy(() => import("@/components/BabylonViewer"));
@@ -54,6 +56,8 @@ type Asset = {
   is_public: boolean;
   created_by_username: string;
   download_url?: string;
+   is_favorited?: boolean;
+  favorites_count?: number;
 };
 
 export default function Dashboard() {
@@ -73,6 +77,7 @@ export default function Dashboard() {
     tags: "",
     date_from: "",
     date_to: "",
+     favorites_only: false,
   });
   const [availableCategories, setAvailableCategories] = useState<string[]>([]);
   const [availableTags, setAvailableTags] = useState<string[]>([]);
@@ -421,23 +426,32 @@ export default function Dashboard() {
                   <VStack align="start" spacing={3}>
                     {/* Preview Image/Thumbnail */}
                     {displayType === "image" && (
-                      <Image
-                        src={getFullFileUrl(asset.file)}
-                        alt={asset.name}
-                        borderRadius="md"
-                        w="100%"
-                        h="150px"
-                        objectFit="cover"
-                        onClick={() => handlePreview(asset)}
-                        fallback={
-                          <Box w="100%" h="150px" bg="gray.100" borderRadius="md" display="flex" alignItems="center" justifyContent="center">
-                            <Text color="gray.500">Image not loading</Text>
-                          </Box>
-                        }
-                      />
+                      <Box position="relative" w="100%" h="150px" onClick={() => handlePreview(asset)}>
+                        <Image
+                          src={getFullFileUrl(asset.file)}
+                          alt={asset.name}
+                          borderRadius="md"
+                          w="100%"
+                          h="100%"
+                          objectFit="cover"
+                          fallback={
+                            <Box w="100%" h="100%" bg="gray.100" borderRadius="md" display="flex" alignItems="center" justifyContent="center">
+                              <Text color="gray.500">Image not loading</Text>
+                            </Box>
+                          }
+                        />
+
+                        <FavoriteButton
+                          assetId={asset.id}
+                          isFavorited={asset.is_favorited}
+                          onToggle={fetchAssets}
+                          position="absolute"
+                        />
+                      </Box>
                     )}
+
                     {displayType === "video" && (
-                      <Box w="100%" h="150px" bg="gray.800" borderRadius="md" display="flex" alignItems="center" justifyContent="center" position="relative" onClick={() => handlePreview(asset)}>
+                      <Box position="relative" w="100%" h="150px" bg="gray.800" borderRadius="md" onClick={() => handlePreview(asset)}>
                         <video
                           src={getFullFileUrl(asset.file)}
                           style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '8px' }}
@@ -445,18 +459,13 @@ export default function Dashboard() {
                         <Box position="absolute" bottom="2" right="2" bg="black" color="white" px={2} py={1} borderRadius="md" fontSize="xs">
                           ▶️
                         </Box>
-                      </Box>
-                    )}
-                    {displayType === "pdf" && (
-                      <Box w="100%" h="150px" bg="red.100" borderRadius="md" display="flex" alignItems="center" justifyContent="center" onClick={() => handlePreview(asset)}>
-                        <Box textAlign="center">
-                          <Text fontWeight="bold" color="red.600">
-                            📄 PDF
-                          </Text>
-                          <Text fontSize="sm" color="red.600" mt={1}>
-                            {asset.name}
-                          </Text>
-                        </Box>
+                        {/* Favorite Button */}
+                        <FavoriteButton
+                          assetId={asset.id}
+                          isFavorited={asset.is_favorited}
+                          onToggle={fetchAssets}
+                          position="absolute"
+                        />
                       </Box>
                     )}
                     {displayType === "document" && (
@@ -469,7 +478,14 @@ export default function Dashboard() {
                             {asset.name}
                           </Text>
                         </Box>
+                        <FavoriteButton
+                          assetId={asset.id}
+                          isFavorited={asset.is_favorited}
+                          onToggle={fetchAssets}
+                          position="absolute"
+                        />
                       </Box>
+
                     )}
                     {displayType === "3d" && (
                       <Box w="100%" h="150px" bg="purple.100" borderRadius="md" display="flex" alignItems="center" justifyContent="center" onClick={() => handlePreview(asset)}>
@@ -481,7 +497,14 @@ export default function Dashboard() {
                             {asset.name}
                           </Text>
                         </Box>
+                        <FavoriteButton
+                          assetId={asset.id}
+                          isFavorited={asset.is_favorited}
+                          onToggle={fetchAssets}
+                          position="absolute"
+                        />
                       </Box>
+
                     )}
                     {displayType === "other" && (
                       <Box w="100%" h="150px" bg="gray.100" borderRadius="md" display="flex" alignItems="center" justifyContent="center" onClick={() => handlePreview(asset)}>
@@ -545,6 +568,8 @@ export default function Dashboard() {
                           />
                         </Tooltip>
 
+
+
                         {/* Edit Button (Admin & Editor only) */}
                         {(role === "Admin" || role === "Editor") && (
                           <Tooltip label="Edit asset">
@@ -562,6 +587,10 @@ export default function Dashboard() {
                           </Tooltip>
                         )}
                       </HStack>
+
+
+
+
 
                       {/* Public/Private Badge */}
                       <Badge colorScheme={asset.is_public ? "green" : "orange"}>
@@ -685,4 +714,40 @@ export default function Dashboard() {
       </Box>
     </Flex>
   );
+
 }
+const favoriteApi = {
+  async toggleFavorite(assetId: number, isCurrentlyFavorited: boolean) {
+    const token = localStorage.getItem("token");
+    const action = isCurrentlyFavorited ? 'unfavorite' : 'favorite';
+
+    const response = await fetch(`http://127.0.0.1:8000/api/assets/${assetId}/${action}/`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Token ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to toggle favorite');
+    }
+
+    return await response.json();
+  },
+
+  async getFavorites() {
+    const token = localStorage.getItem("token");
+    const response = await fetch('http://127.0.0.1:8000/api/assets/favorites/', {
+      headers: {
+        'Authorization': `Token ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch favorites');
+    }
+
+    return await response.json();
+  },
+};

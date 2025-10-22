@@ -24,6 +24,13 @@ class Asset(models.Model):
     thumbnail = models.ImageField(upload_to='thumbnails/', blank=True, null=True)
     is_public = models.BooleanField(default=True)
 
+    favorited_by = models.ManyToManyField(
+        settings.AUTH_USER_MODEL,
+        related_name='favorite_assets',
+        blank=True
+    )
+
+
     # 3D-specific data
     preview_url = models.URLField(blank=True, null=True)
     polygon_count = models.IntegerField(blank=True, null=True)
@@ -31,3 +38,7 @@ class Asset(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.file_type})"
+
+    def is_favorited_by(self, user):
+        """Check if asset is favorited by a specific user"""
+        return self.favorited_by.filter(id=user.id).exists()

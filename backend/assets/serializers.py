@@ -10,16 +10,27 @@ class AssetSerializer(serializers.ModelSerializer):
         allow_empty=True,
         default=list
     )
-    
+    is_favorited = serializers.SerializerMethodField()
+    favorites_count = serializers.SerializerMethodField()
+
     class Meta:
         model = Asset
         fields = [
             'id', 'user', 'file', 'name', 'description', 'file_type', 
             'file_size', 'tags', 'keywords', 'category', 'created_at', 
             'updated_at', 'thumbnail', 'is_public', 'preview_url', 
-            'polygon_count', 'dimensions'
+            'polygon_count', 'dimensions','is_favorited','favorites_count'
         ]
         read_only_fields = ['id', 'user', 'created_at', 'updated_at']
+
+    def get_is_favorited(self, obj):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            return obj.is_favorited_by(request.user)
+        return False
+
+    def get_favorites_count(self, obj):
+        return obj.favorited_by.count()
     
     def validate_file(self, value):
         # Validate file size (100MB max)

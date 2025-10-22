@@ -13,6 +13,12 @@ class AssetViewSet(viewsets.ModelViewSet):
     queryset = Asset.objects.all()
     serializer_class = AssetSerializer
     parser_classes = [MultiPartParser, FormParser]  # Important for file uploads!
+
+    def get_serializer_context(self):
+        """Pass request to serializer for is_favorited check"""
+        context = super().get_serializer_context()
+        context['request'] = self.request
+        return context
     
     def get_permissions(self):
         if self.action in ['list', 'retrieve']:
@@ -210,7 +216,66 @@ class AssetViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'])
     def public_assets(self, request):
-        """Get only public assets"""
         assets = Asset.objects.filter(is_public=True).order_by('-created_at')
         serializer = self.get_serializer(assets, many=True)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
+    def favorite(self, request, pk=None):
+        asset = self.get_object()
+        user = request.user
+
+        if asset.favorited_by.filter(id=user.id).exists():
+            return Response(
+                {'detail': 'Asset already in favorites'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        asset.favorited_by.add(user)
+
+        # Log the action
+        self.log_action(
+            user=user,
+            action_type="favorite",
+            description=f"Favorited asset '{asset.name}' [id={asset.id}]",
+            ip_address=request.META.get('REMOTE_ADDR'),
+        )
+
+        return Response(
+            {'detail': 'Asset added to favorites'},
+            status=status.HTTP_200_OK
+        )
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
+    def unfavorite(self, request, pk=None):
+        """Remove asset from favorites"""
+        asset = self.get_object()
+        user = request.user
+
+        if not asset.favorited_by.filter(id=user.id).exists():
+            return Response(
+                {'detail': 'Asset not in favorites'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        asset.favorited_by.remove(user)
+
+        # Log the action
+        self.log_action(
+            user=user,
+            action_type="unfavorite",
+            description=f"Unfavorited asset '{asset.name}' [id={asset.id}]",
+            ip_address=request.META.get('REMOTE_ADDR'),
+        )
+
+        return Response(
+            {'detail': 'Asset removed from favorites'},
+            status=status.HTTP_200_OK
+        )
+
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
+    def favorites(self, request):
+        user = request.user
+        favorites = Asset.objects.filter(favorited_by=user).order_by('-created_at')
+        serializer = self.get_serializer(favorites, many=True)
         return Response(serializer.data)

@@ -37,3 +37,6 @@ Thumbs.db
 *.log
 logs/
 "@ | Out-File -FilePath .gitignore -Encoding utf8
+backend/backend/settings.py
+backend/backend/settings.py
+backend/backend/settings.py
