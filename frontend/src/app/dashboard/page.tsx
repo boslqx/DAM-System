@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, lazy, Suspense } from "react";
+import { useEffect, useState, lazy, Suspense } from "react";
 import {
   Box,
   Grid,
@@ -24,22 +24,21 @@ import {
   HStack,
   IconButton,
   Tooltip,
+  Input,
+  InputGroup,
+  InputLeftElement,
 } from "@chakra-ui/react";
-import { useDropzone } from "react-dropzone";
 import { Worker, Viewer } from "@react-pdf-viewer/core";
 import "@react-pdf-viewer/core/lib/styles/index.css";
 import "@react-pdf-viewer/default-layout/lib/styles/index.css";
 import Sidebar from "@/components/Sidebar";
 import { useRouter } from "next/navigation";
-import { EditIcon, DownloadIcon,StarIcon } from "@chakra-ui/icons";
+import { EditIcon, DownloadIcon, SearchIcon } from "@chakra-ui/icons";
 
-
-// Import new components
 import AssetFilters from "@/components/AssetFilters";
 import EditAssetModal from "@/components/EditAssetModal";
 import FavoriteButton from "@/components/FavoriteButton";
 
-// Lazy load Babylon viewer for better performance
 const BabylonViewer = lazy(() => import("@/components/BabylonViewer"));
 
 type Asset = {
@@ -56,7 +55,7 @@ type Asset = {
   is_public: boolean;
   created_by_username: string;
   download_url?: string;
-   is_favorited?: boolean;
+  is_favorited?: boolean;
   favorites_count?: number;
 };
 
@@ -65,11 +64,9 @@ export default function Dashboard() {
   const [role, setRole] = useState<string | null>(null);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [loading, setLoading] = useState(true);
-  const [uploading, setUploading] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
-  
-  // New state for filters and metadata
+
   const [filters, setFilters] = useState({
     search: "",
     category: "",
@@ -77,15 +74,15 @@ export default function Dashboard() {
     tags: "",
     date_from: "",
     date_to: "",
-     favorites_only: false,
+    favorites_only: false,
   });
   const [availableCategories, setAvailableCategories] = useState<string[]>([]);
   const [availableTags, setAvailableTags] = useState<string[]>([]);
+  const [quickSearch, setQuickSearch] = useState("");
 
   const toast = useToast();
   const { isOpen, onOpen, onClose } = useDisclosure();
 
-  // 🔹 Check login & role from localStorage
   useEffect(() => {
     const token = localStorage.getItem("token");
     const storedRole = localStorage.getItem("role");
@@ -96,7 +93,6 @@ export default function Dashboard() {
     }
   }, [router]);
 
-  // 🔹 Fetch metadata (categories and tags)
   const fetchMetadata = async () => {
     try {
       const token = localStorage.getItem("token");
@@ -108,7 +104,7 @@ export default function Dashboard() {
           headers: { Authorization: `Token ${token}` },
         }),
       ]);
-      
+
       if (categoriesRes.ok) {
         const categories = await categoriesRes.json();
         setAvailableCategories(categories);
@@ -122,7 +118,6 @@ export default function Dashboard() {
     }
   };
 
-  // 🔹 Enhanced fetch assets with filters
   const fetchAssets = async () => {
     const token = localStorage.getItem("token");
     if (!token) {
@@ -132,13 +127,17 @@ export default function Dashboard() {
 
     try {
       setLoading(true);
-      
-      // Build query parameters from filters
+
       const params = new URLSearchParams();
       Object.entries(filters).forEach(([key, value]) => {
         if (value) params.append(key, value);
       });
-      
+
+      // Add quick search to filters
+      if (quickSearch.trim()) {
+        params.set('search', quickSearch);
+      }
+
       const queryString = params.toString();
       const url = `http://127.0.0.1:8000/api/assets/${queryString ? `?${queryString}` : ''}`;
 
@@ -153,7 +152,7 @@ export default function Dashboard() {
       }
 
       const data = await res.json();
-      
+
       if (Array.isArray(data)) {
         setAssets(data);
       } else if (data.results && Array.isArray(data.results)) {
@@ -175,71 +174,23 @@ export default function Dashboard() {
     }
   };
 
-  // 🔹 Initial data fetch
   useEffect(() => {
     fetchAssets();
     fetchMetadata();
   }, []);
 
-  // 🔹 Refetch when filters change
   useEffect(() => {
     fetchAssets();
   }, [filters]);
 
-  // 🔹 File upload handler
-  const onDrop = useCallback(
-    async (acceptedFiles: File[]) => {
-      if (role !== "Admin" && role !== "Editor") {
-        toast({ title: "Access denied", status: "error" });
-        return;
-      }
+  // Debounced search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchAssets();
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [quickSearch]);
 
-      const file = acceptedFiles[0];
-      if (!file) return;
-
-      setUploading(true);
-      const formData = new FormData();
-      formData.append("name", file.name);
-      formData.append("file", file);
-
-      const ext = file.name.split(".").pop()?.toLowerCase();
-      let detectedType = "OTH";
-      if (["jpg", "jpeg", "png", "gif", "webp"].includes(ext!)) detectedType = "IMG";
-      else if (["mp4", "mov", "avi", "webm"].includes(ext!)) detectedType = "VID";
-      else if (["pdf", "doc", "docx", "ppt", "pptx", "xls", "xlsx", "txt"].includes(ext!)) detectedType = "DOC";
-      else if (["glb", "gltf", "obj", "fbx"].includes(ext!)) detectedType = "3D";
-
-      formData.append("file_type", detectedType);
-
-      const res = await fetch("http://127.0.0.1:8000/api/assets/", {
-        method: "POST",
-        body: formData,
-        headers: {
-          Authorization: `Token ${localStorage.getItem("token")}`,
-        },
-      });
-
-      if (res.ok) {
-        const newAsset = await res.json();
-        setAssets((prev) => [newAsset, ...prev]);
-        toast({ title: "Upload successful!", status: "success" });
-        
-        // Refresh metadata after upload
-        fetchMetadata();
-      } else {
-        toast({ title: "Upload failed!", status: "error" });
-      }
-      setUploading(false);
-    },
-    [role, toast]
-  );
-
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop,
-    accept: { "*/*": [] },
-  });
-
-  // 🔹 Handle asset update
   const handleUpdateAsset = async (assetData: any) => {
     const token = localStorage.getItem("token");
     const res = await fetch(`http://127.0.0.1:8000/api/assets/${assetData.id}/`, {
@@ -250,15 +201,13 @@ export default function Dashboard() {
       },
       body: JSON.stringify(assetData),
     });
-    
+
     if (!res.ok) throw new Error("Failed to update asset");
-    
-    // Refresh assets and metadata
+
     fetchAssets();
     fetchMetadata();
   };
 
-  // 🔹 Handle asset deletion
   const handleDeleteAsset = async (assetId: number) => {
     if (!confirm("Are you sure you want to delete this asset?")) return;
 
@@ -279,8 +228,6 @@ export default function Dashboard() {
           duration: 3000,
           isClosable: true,
         });
-        
-        // Refresh metadata
         fetchMetadata();
       } else {
         throw new Error("Failed to delete asset");
@@ -295,12 +242,10 @@ export default function Dashboard() {
     }
   };
 
-  // Helper function to get file extension
   const getFileExtension = (filename: string): string => {
     return filename.split('.').pop()?.toLowerCase() || '';
   };
 
-  // Helper function to determine preview type
   const getPreviewType = (asset: Asset): string => {
     const extension = getFileExtension(asset.name);
     if (asset.file_type === 'IMG') return 'image';
@@ -309,14 +254,13 @@ export default function Dashboard() {
     if (asset.file_type === 'DOC') {
       return extension === 'pdf' ? 'pdf' : 'document';
     }
-    
-    // Fallback: check by file extension
+
     if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(extension)) return 'image';
     if (['mp4', 'mov', 'avi', 'webm'].includes(extension)) return 'video';
     if (['pdf'].includes(extension)) return 'pdf';
     if (['glb', 'gltf', 'obj', 'fbx'].includes(extension)) return '3d';
     if (['doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx', 'txt'].includes(extension)) return 'document';
-    
+
     return 'other';
   };
 
@@ -325,7 +269,6 @@ export default function Dashboard() {
     onOpen();
   };
 
-  // Get full file URL (handles relative URLs from Django)
   const getFullFileUrl = (fileUrl: string): string => {
     if (fileUrl.startsWith('http')) {
       return fileUrl;
@@ -349,48 +292,45 @@ export default function Dashboard() {
           Asset Dashboard
         </Heading>
 
-        {/* 🔹 NEW: Search and Filter Component */}
+        {/* Enhanced Search Bar */}
+        <Box mb={6}>
+          <InputGroup size="lg" maxW="800px">
+            <InputLeftElement pointerEvents="none">
+              <SearchIcon color="brand.200" />
+            </InputLeftElement>
+            <Input
+              placeholder="Search assets by name, description, category, or tags..."
+              value={quickSearch}
+              onChange={(e) => setQuickSearch(e.target.value)}
+              bg="white"
+              borderWidth="2px"
+              borderColor="brand.200"
+              _hover={{
+                borderColor: "brand.300",
+                boxShadow: "0 0 0 1px var(--chakra-colors-brand-300)"
+              }}
+              _focus={{
+                borderColor: "brand.300",
+                boxShadow: "0 4px 12px rgba(166, 146, 199, 0.3)"
+              }}
+              borderRadius="xl"
+            />
+          </InputGroup>
+          {quickSearch && (
+            <Text fontSize="sm" color="gray.600" mt={2}>
+              Found {assets.length} result{assets.length !== 1 ? 's' : ''}
+            </Text>
+          )}
+        </Box>
+
+        {/* Search and Filter Component */}
         <AssetFilters
           onFiltersChange={setFilters}
           availableCategories={availableCategories}
           availableTags={availableTags}
         />
 
-        {/* 🔹 Editor & Admin upload */}
-        {(role === "Admin" || role === "Editor") && (
-          <Box
-            {...getRootProps()}
-            border="2px dashed"
-            borderColor={isDragActive ? "brand.300" : "brand.200"}
-            bg={isDragActive ? "brand.100" : "white"}
-            borderRadius="xl"
-            p={10}
-            textAlign="center"
-            mb={8}
-            cursor="pointer"
-            transition="0.2s ease"
-          >
-            <input {...getInputProps()} />
-            {uploading ? (
-              <Spinner size="lg" color="brand.200" />
-            ) : isDragActive ? (
-              <Text color="brand.300" fontWeight="bold">
-                Drop your file here...
-              </Text>
-            ) : (
-              <>
-                <Text fontSize="lg" color="brand.200">
-                  Drag & Drop or Click to Upload
-                </Text>
-                <Text fontSize="sm" color="gray.600">
-                  Supported: Any file type (images, videos, PDFs, documents, 3D models, etc.)
-                </Text>
-              </>
-            )}
-          </Box>
-        )}
-
-        {/* 🔹 Asset Grid (all roles) */}
+        {/* Asset Grid */}
         {loading ? (
           <Flex justify="center" align="center" py={8}>
             <Spinner size="xl" color="brand.200" />
@@ -398,10 +338,24 @@ export default function Dashboard() {
         ) : assets.length === 0 ? (
           <Flex justify="center" align="center" py={8} direction="column" gap={3}>
             <Text color="gray.500">No assets found.</Text>
-            {(filters.search || filters.category || filters.file_type || filters.tags) && (
-              <Button colorScheme="blue" variant="ghost" size="sm" onClick={() => setFilters({
-                search: "", category: "", file_type: "", tags: "", date_from: "", date_to: ""
-              })}>
+            {(quickSearch || filters.search || filters.category || filters.file_type || filters.tags) && (
+              <Button
+                colorScheme="blue"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setQuickSearch("");
+                  setFilters({
+                    search: "",
+                    category: "",
+                    file_type: "",
+                    tags: "",
+                    date_from: "",
+                    date_to: "",
+                    favorites_only: false
+                  });
+                }}
+              >
                 Clear filters to see all assets
               </Button>
             )}
@@ -424,7 +378,6 @@ export default function Dashboard() {
                   cursor="pointer"
                 >
                   <VStack align="start" spacing={3}>
-                    {/* Preview Image/Thumbnail */}
                     {displayType === "image" && (
                       <Box position="relative" w="100%" h="150px" onClick={() => handlePreview(asset)}>
                         <Image
@@ -440,7 +393,6 @@ export default function Dashboard() {
                             </Box>
                           }
                         />
-
                         <FavoriteButton
                           assetId={asset.id}
                           isFavorited={asset.is_favorited}
@@ -459,7 +411,6 @@ export default function Dashboard() {
                         <Box position="absolute" bottom="2" right="2" bg="black" color="white" px={2} py={1} borderRadius="md" fontSize="xs">
                           ▶️
                         </Box>
-                        {/* Favorite Button */}
                         <FavoriteButton
                           assetId={asset.id}
                           isFavorited={asset.is_favorited}
@@ -468,13 +419,14 @@ export default function Dashboard() {
                         />
                       </Box>
                     )}
+
                     {displayType === "document" && (
-                      <Box w="100%" h="150px" bg="blue.100" borderRadius="md" display="flex" alignItems="center" justifyContent="center" onClick={() => handlePreview(asset)}>
+                      <Box w="100%" h="150px" bg="blue.100" borderRadius="md" display="flex" alignItems="center" justifyContent="center" onClick={() => handlePreview(asset)} position="relative">
                         <Box textAlign="center">
                           <Text fontWeight="bold" color="blue.600">
-                            📝 Document
+                            📄 Document
                           </Text>
-                          <Text fontSize="sm" color="blue.600" mt={1}>
+                          <Text fontSize="sm" color="blue.600" mt={1} noOfLines={1}>
                             {asset.name}
                           </Text>
                         </Box>
@@ -485,15 +437,15 @@ export default function Dashboard() {
                           position="absolute"
                         />
                       </Box>
-
                     )}
+
                     {displayType === "3d" && (
-                      <Box w="100%" h="150px" bg="purple.100" borderRadius="md" display="flex" alignItems="center" justifyContent="center" onClick={() => handlePreview(asset)}>
+                      <Box w="100%" h="150px" bg="purple.100" borderRadius="md" display="flex" alignItems="center" justifyContent="center" onClick={() => handlePreview(asset)} position="relative">
                         <Box textAlign="center">
                           <Text fontWeight="bold" color="purple.600">
                             🎯 3D Model
                           </Text>
-                          <Text fontSize="sm" color="purple.600" mt={1}>
+                          <Text fontSize="sm" color="purple.600" mt={1} noOfLines={1}>
                             {asset.name}
                           </Text>
                         </Box>
@@ -504,29 +456,27 @@ export default function Dashboard() {
                           position="absolute"
                         />
                       </Box>
-
                     )}
+
                     {displayType === "other" && (
                       <Box w="100%" h="150px" bg="gray.100" borderRadius="md" display="flex" alignItems="center" justifyContent="center" onClick={() => handlePreview(asset)}>
                         <Box textAlign="center">
                           <Text color="gray.600">
                             📁 File
                           </Text>
-                          <Text fontSize="sm" color="gray.600" mt={1}>
+                          <Text fontSize="sm" color="gray.600" mt={1} noOfLines={1}>
                             {asset.name}
                           </Text>
                         </Box>
                       </Box>
                     )}
 
-                    {/* Asset Info */}
                     <Box w="100%">
                       <Text fontWeight="bold" noOfLines={1}>{asset.name}</Text>
                       <Text fontSize="sm" color="gray.600" noOfLines={2}>
                         {asset.description || "No description"}
                       </Text>
-                      
-                      {/* Tags */}
+
                       {asset.tags && asset.tags.length > 0 && (
                         <Flex wrap="wrap" gap={1} mt={2}>
                           {asset.tags.slice(0, 3).map((tag, index) => (
@@ -541,7 +491,7 @@ export default function Dashboard() {
                           )}
                         </Flex>
                       )}
-                      
+
                       <Text fontSize="xs" color="gray.500" mt={2}>
                         Type: {asset.file_type} • Size: {(asset.file_size / 1024 / 1024).toFixed(1)}MB
                       </Text>
@@ -550,10 +500,8 @@ export default function Dashboard() {
                       </Text>
                     </Box>
 
-                    {/* Action Buttons */}
                     <Flex justify="space-between" w="100%" pt={2}>
                       <HStack>
-                        {/* Download Button */}
                         <Tooltip label="Download asset">
                           <IconButton
                             aria-label="Download asset"
@@ -568,9 +516,6 @@ export default function Dashboard() {
                           />
                         </Tooltip>
 
-
-
-                        {/* Edit Button (Admin & Editor only) */}
                         {(role === "Admin" || role === "Editor") && (
                           <Tooltip label="Edit asset">
                             <IconButton
@@ -588,11 +533,6 @@ export default function Dashboard() {
                         )}
                       </HStack>
 
-
-
-
-
-                      {/* Public/Private Badge */}
                       <Badge colorScheme={asset.is_public ? "green" : "orange"}>
                         {asset.is_public ? "Public" : "Private"}
                       </Badge>
@@ -604,7 +544,7 @@ export default function Dashboard() {
           </Grid>
         )}
 
-        {/* 🔹 Preview Modal */}
+        {/* Preview Modal */}
         <Modal isOpen={isOpen} onClose={onClose} size="4xl" isCentered>
           <ModalOverlay />
           <ModalContent maxH="90vh" overflow="hidden">
@@ -619,7 +559,7 @@ export default function Dashboard() {
               {selectedAsset && (() => {
                 const previewType = getPreviewType(selectedAsset);
                 const fullFileUrl = getFullFileUrl(selectedAsset.file);
-                
+
                 switch (previewType) {
                   case 'image':
                     return (
@@ -703,7 +643,7 @@ export default function Dashboard() {
           </ModalContent>
         </Modal>
 
-        {/* 🔹 NEW: Edit Asset Modal */}
+        {/* Edit Asset Modal */}
         <EditAssetModal
           isOpen={!!editingAsset}
           onClose={() => setEditingAsset(null)}
@@ -714,40 +654,4 @@ export default function Dashboard() {
       </Box>
     </Flex>
   );
-
 }
-const favoriteApi = {
-  async toggleFavorite(assetId: number, isCurrentlyFavorited: boolean) {
-    const token = localStorage.getItem("token");
-    const action = isCurrentlyFavorited ? 'unfavorite' : 'favorite';
-
-    const response = await fetch(`http://127.0.0.1:8000/api/assets/${assetId}/${action}/`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Token ${token}`,
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to toggle favorite');
-    }
-
-    return await response.json();
-  },
-
-  async getFavorites() {
-    const token = localStorage.getItem("token");
-    const response = await fetch('http://127.0.0.1:8000/api/assets/favorites/', {
-      headers: {
-        'Authorization': `Token ${token}`,
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to fetch favorites');
-    }
-
-    return await response.json();
-  },
-};

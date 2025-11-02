@@ -10,15 +10,20 @@ import {
   FormControl,
   FormLabel,
   VStack,
+  InputGroup,
+  InputRightElement,
+  IconButton,
 } from "@chakra-ui/react";
 import { useState } from "react";
+import { ViewIcon, ViewOffIcon } from "@chakra-ui/icons";
 import axios from "axios";
 import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [username, setUsername] = useState(""); // changed from email
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -26,7 +31,7 @@ export default function LoginPage() {
 
     try {
       const res = await axios.post("http://127.0.0.1:8000/api/auth/login/", {
-        username,   // send username instead of email
+        username,
         password,
       });
 
@@ -69,7 +74,7 @@ export default function LoginPage() {
               <FormControl isRequired>
                 <FormLabel>Username</FormLabel>
                 <Input
-                  type="text" // changed from email
+                  type="text"
                   placeholder="Enter your username"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
@@ -80,14 +85,26 @@ export default function LoginPage() {
 
               <FormControl isRequired>
                 <FormLabel>Password</FormLabel>
-                <Input
-                  type="password"
-                  placeholder="Enter your password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  bg="white"
-                  _focus={{ borderColor: "brand.200" }}
-                />
+                <InputGroup>
+                  <Input
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Enter your password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    bg="white"
+                    _focus={{ borderColor: "brand.200" }}
+                  />
+                  <InputRightElement>
+                    <IconButton
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                      icon={showPassword ? <ViewOffIcon /> : <ViewIcon />}
+                      onClick={() => setShowPassword(!showPassword)}
+                      variant="ghost"
+                      size="sm"
+                      _hover={{ bg: "transparent" }}
+                    />
+                  </InputRightElement>
+                </InputGroup>
               </FormControl>
 
               {error && (
@@ -110,7 +127,7 @@ export default function LoginPage() {
           </form>
 
           <Text fontSize="sm" textAlign="center" color="gray.600" mt={4}>
-            © 2025 DAM System — All rights reserved.
+            © 2025 DAM System – All rights reserved.
           </Text>
         </VStack>
       </Box>
