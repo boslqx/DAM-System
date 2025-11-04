@@ -38,6 +38,7 @@ import { EditIcon, DownloadIcon, SearchIcon } from "@chakra-ui/icons";
 import AssetFilters from "@/components/AssetFilters";
 import EditAssetModal from "@/components/EditAssetModal";
 import FavoriteButton from "@/components/FavoriteButton";
+import DashboardStatsWidget from "@/components/DashboardStatsWidget";
 
 const BabylonViewer = lazy(() => import("@/components/BabylonViewer"));
 
@@ -130,7 +131,7 @@ export default function Dashboard() {
 
       const params = new URLSearchParams();
       Object.entries(filters).forEach(([key, value]) => {
-        if (value) params.append(key, value);
+        if (value) params.append(key,value);
       });
 
       // Add quick search to filters
@@ -291,7 +292,7 @@ export default function Dashboard() {
         <Heading mb={6} color="gray.700">
           Asset Dashboard
         </Heading>
-
+        
         {/* Enhanced Search Bar */}
         <Box mb={6}>
           <InputGroup size="lg" maxW="800px">

@@ -20,6 +20,7 @@ import { motion } from "framer-motion";
 import { Home, Upload, Settings, LogOut, Users, Activity, Star } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { BarChart3 } from "lucide-react";
 
 const MotionBox = motion.create(Box);
 
@@ -106,6 +107,16 @@ export default function Sidebar() {
               icon={<Star />}
               variant="ghost"
               onClick={() => goTo("/favorites")}
+            />
+          </Tooltip>
+
+          {/* Statistics - Available for all roles */}
+          <Tooltip label="Statistics" placement="right">
+            <IconButton
+              aria-label="Statistics"
+              icon={<BarChart3 />}
+              variant="ghost"
+              onClick={() => goTo("/stats")}
             />
           </Tooltip>
 

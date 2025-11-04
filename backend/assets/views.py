@@ -8,6 +8,7 @@ from .serializers import AssetSerializer
 from users.permissions import IsAdmin, IsEditorOrAdmin, IsViewerOrHigher
 from activitylog.models import ActivityLog  
 import json
+from django.db.models import Sum, Count
 
 class AssetViewSet(viewsets.ModelViewSet):
     queryset = Asset.objects.all()
@@ -278,4 +279,67 @@ class AssetViewSet(viewsets.ModelViewSet):
         user = request.user
         favorites = Asset.objects.filter(favorited_by=user).order_by('-created_at')
         serializer = self.get_serializer(favorites, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
+    def stats(self, request):
+        """Get dashboard statistics for the current user"""
+        user = request.user
+        
+        # Get assets based on user role
+        if hasattr(user, 'role') and user.role == 'Admin':
+            user_assets = Asset.objects.all()
+        else:
+            user_assets = Asset.objects.filter(user=user)
+        
+        # Calculate statistics
+        total_assets = user_assets.count()
+        total_size = user_assets.aggregate(total=Sum('file_size'))['total'] or 0
+        favorites_count = user.favorite_assets.count()
+        
+        # Get file type distribution
+        file_type_distribution = user_assets.values('file_type').annotate(
+            count=Count('id')
+        ).order_by('-count')
+        
+        # Get recent uploads (last 5)
+        recent_uploads = user_assets.order_by('-created_at')[:5]
+        recent_serializer = self.get_serializer(recent_uploads, many=True)
+        
+        # Get category distribution
+        category_distribution = user_assets.exclude(
+            category__isnull=True
+        ).exclude(
+            category=''
+        ).values('category').annotate(
+            count=Count('id')
+        ).order_by('-count')[:5]
+        
+        return Response({
+            'total_assets': total_assets,
+            'total_size': total_size,  # in bytes
+            'total_size_mb': round(total_size / (1024 * 1024), 2),
+            'favorites_count': favorites_count,
+            'file_type_distribution': list(file_type_distribution),
+            'category_distribution': list(category_distribution),
+            'recent_uploads': recent_serializer.data,
+        })
+
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
+    def recent(self, request):
+        """Get recently uploaded assets (last 10)"""
+        user = request.user
+        
+        # Get assets based on user role
+        if hasattr(user, 'role') and user.role == 'Admin':
+            recent_assets = Asset.objects.all()
+        else:
+            recent_assets = Asset.objects.filter(
+                user=user
+            ) | Asset.objects.filter(
+                is_public=True
+            )
+        
+        recent_assets = recent_assets.order_by('-created_at')[:10]
+        serializer = self.get_serializer(recent_assets, many=True)
         return Response(serializer.data)
