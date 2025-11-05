@@ -8,7 +8,6 @@ import {
   Heading,
   FormControl,
   FormLabel,
-  FormHelperText,
   Input,
   Textarea,
   Select,
@@ -19,20 +18,50 @@ import {
   Image,
   Icon,
   Switch,
-  Divider,
   Grid,
   useToast,
   HStack,
-  Spinner,
+  Wrap,
+  WrapItem,
+  Tag,
+  TagLabel,
+  TagCloseButton,
+  Progress,
+  InputGroup,
+  InputRightElement,
+  Collapse,
+  useDisclosure,
+  ScaleFade,
+  Container,
+  Card,
+  CardBody,
 } from "@chakra-ui/react";
-import { FiUpload, FiFile, FiImage, FiVideo, FiBox } from "react-icons/fi";
+import { 
+  FiUpload, 
+  FiFile, 
+  FiImage, 
+  FiVideo, 
+  FiBox, 
+  FiCheck,
+  FiX,
+  FiPlus,
+  FiChevronDown,
+  FiChevronUp,
+  FiInfo,
+  FiAlertCircle,
+  FiSave
+} from "react-icons/fi";
 import Sidebar from "@/components/Sidebar";
+import { motion, AnimatePresence } from "framer-motion";
+
+const MotionBox = motion.create(Box);
+const MotionFlex = motion.create(Flex);
 
 type AssetFormData = {
   name: string;
   description: string;
   category: string;
-  tags: string;
+  tags: string[];
   keywords: string;
   is_public: boolean;
 };
@@ -41,65 +70,56 @@ export default function RegisterAssetPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string>("");
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [currentStep, setCurrentStep] = useState(1);
+  const [isDragging, setIsDragging] = useState(false);
+  const [newTag, setNewTag] = useState("");
   const [formData, setFormData] = useState<AssetFormData>({
     name: "",
     description: "",
     category: "",
-    tags: "",
+    tags: [],
     keywords: "",
     is_public: true,
   });
   
   const toast = useToast();
   const router = useRouter();
+  const { isOpen: showAdvanced, onToggle: toggleAdvanced } = useDisclosure();
 
-  // Determine file type based on extension and MIME type
+  const categories = [
+    { value: "3D Models", icon: FiBox, color: "purple.500", emoji: "🎯" },
+    { value: "Images", icon: FiImage, color: "green.500", emoji: "🖼️" },
+    { value: "Videos", icon: FiVideo, color: "red.500", emoji: "🎬" },
+    { value: "Documents", icon: FiFile, color: "blue.500", emoji: "📄" },
+    { value: "Other", icon: FiFile, color: "gray.500", emoji: "📦" },
+  ];
+
   const getFileType = (file: File): string => {
     const ext = file.name.split('.').pop()?.toLowerCase() || '';
     const mimeType = file.type.toLowerCase();
 
-    // 3D Models
-    if (['glb', 'gltf', 'obj', 'fbx', 'stl', 'dae', '3ds'].includes(ext)) {
-      return '3D';
-    }
-    // Images
-    if (mimeType.startsWith('image/') || ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(ext)) {
-      return 'IMG';
-    }
-    // Videos
-    if (mimeType.startsWith('video/') || ['mp4', 'mov', 'avi', 'webm', 'mkv', 'wmv'].includes(ext)) {
-      return 'VID';
-    }
-    // Documents
-    if (['pdf', 'doc', 'docx', 'txt', 'xls', 'xlsx', 'ppt', 'pptx', 'csv'].includes(ext)) {
-      return 'DOC';
-    }
-    // Other
+    if (['glb', 'gltf', 'obj', 'fbx', 'stl', 'dae', '3ds'].includes(ext)) return '3D';
+    if (mimeType.startsWith('image/') || ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(ext)) return 'IMG';
+    if (mimeType.startsWith('video/') || ['mp4', 'mov', 'avi', 'webm', 'mkv', 'wmv'].includes(ext)) return 'VID';
+    if (['pdf', 'doc', 'docx', 'txt', 'xls', 'xlsx', 'ppt', 'pptx', 'csv'].includes(ext)) return 'DOC';
     return 'OTH';
   };
 
-  // Get file type icon and color
   const getFileTypeInfo = (fileType: string) => {
     switch (fileType) {
-      case '3D':
-        return { icon: FiBox, color: 'purple', label: '3D Model' };
-      case 'IMG':
-        return { icon: FiImage, color: 'green', label: 'Image' };
-      case 'VID':
-        return { icon: FiVideo, color: 'red', label: 'Video' };
-      case 'DOC':
-        return { icon: FiFile, color: 'blue', label: 'Document' };
-      default:
-        return { icon: FiFile, color: 'gray', label: 'File' };
+      case '3D': return { icon: FiBox, color: 'purple', label: '3D Model', gradient: 'linear(to-r, purple.400, pink.400)' };
+      case 'IMG': return { icon: FiImage, color: 'green', label: 'Image', gradient: 'linear(to-r, green.400, teal.400)' };
+      case 'VID': return { icon: FiVideo, color: 'red', label: 'Video', gradient: 'linear(to-r, red.400, orange.400)' };
+      case 'DOC': return { icon: FiFile, color: 'blue', label: 'Document', gradient: 'linear(to-r, blue.400, cyan.400)' };
+      default: return { icon: FiFile, color: 'gray', label: 'File', gradient: 'linear(to-r, gray.400, gray.500)' };
     }
   };
 
-  // Handle file selection
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    // Validate file size (max 100MB)
     const maxSize = 100 * 1024 * 1024;
     if (file.size > maxSize) {
       toast({
@@ -114,7 +134,6 @@ export default function RegisterAssetPage() {
 
     setSelectedFile(file);
 
-    // Generate preview for images
     if (file.type.startsWith('image/')) {
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -125,47 +144,56 @@ export default function RegisterAssetPage() {
       setPreviewUrl("");
     }
 
-    // Auto-populate name if empty
     if (!formData.name.trim()) {
       const nameWithoutExt = file.name.replace(/\.[^/.]+$/, "");
       setFormData(prev => ({ ...prev, name: nameWithoutExt }));
     }
 
-    // Auto-set category based on file type
     const fileType = getFileType(file);
     if (!formData.category) {
       const categoryMap: { [key: string]: string } = {
-        '3D': '3D Models',
-        'IMG': 'Images',
-        'VID': 'Videos',
-        'DOC': 'Documents',
-        'OTH': 'Other'
+        '3D': '3D Models', 'IMG': 'Images', 'VID': 'Videos', 'DOC': 'Documents', 'OTH': 'Other'
       };
       setFormData(prev => ({ ...prev, category: categoryMap[fileType] || 'Other' }));
     }
+
+    setCurrentStep(2);
   };
 
-  // Handle drag and drop
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
+    setIsDragging(false);
     const file = e.dataTransfer.files[0];
     if (file) {
-      // Create a proper FileList-like object
       const dataTransfer = new DataTransfer();
       dataTransfer.items.add(file);
-      
-      // Create a proper input change event
       const inputEvent = {
-        target: {
-          files: dataTransfer.files
-        }
+        target: { files: dataTransfer.files }
       } as React.ChangeEvent<HTMLInputElement>;
-      
       handleFileSelect(inputEvent);
     }
   }, []);
 
-  // Upload handler
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = () => {
+    setIsDragging(false);
+  };
+
+  const addTag = () => {
+    if (newTag.trim() && !formData.tags.includes(newTag.trim())) {
+      setFormData(prev => ({ ...prev, tags: [...prev.tags, newTag.trim()] }));
+      setNewTag("");
+    }
+  };
+
+  const removeTag = (tagToRemove: string) => {
+    setFormData(prev => ({ ...prev, tags: prev.tags.filter(tag => tag !== tagToRemove) }));
+  };
+
   const handleUpload = async () => {
     if (!selectedFile) {
       toast({
@@ -191,9 +219,23 @@ export default function RegisterAssetPage() {
 
     try {
       setUploading(true);
+      setUploadProgress(0);
+
+      // Simulate upload progress
+      const progressInterval = setInterval(() => {
+        setUploadProgress(prev => {
+          if (prev >= 90) {
+            clearInterval(progressInterval);
+            return prev;
+          }
+          return prev + 10;
+        });
+      }, 200);
+
       const token = localStorage.getItem("token");
 
       if (!token) {
+        clearInterval(progressInterval);
         toast({
           title: "Authentication required",
           description: "Please log in to upload assets",
@@ -205,16 +247,8 @@ export default function RegisterAssetPage() {
         return;
       }
 
-      // STEP 1: Upload the file first
       const fileFormData = new FormData();
       fileFormData.append('file', selectedFile);
-      
-      // Convert tags to array
-      const tagsArray = formData.tags && formData.tags.trim() 
-        ? formData.tags.split(',').map(tag => tag.trim()).filter(Boolean)
-        : [];
-      
-      // Add all other fields as form data
       fileFormData.append('name', formData.name);
       fileFormData.append('description', formData.description);
       fileFormData.append('category', formData.category);
@@ -223,15 +257,8 @@ export default function RegisterAssetPage() {
       fileFormData.append('is_public', formData.is_public.toString());
       fileFormData.append('keywords', formData.keywords || '');
       
-      // Send tags as individual array items expected by the API
-      if (tagsArray.length > 0) {
-        tagsArray.forEach((tag) => fileFormData.append('tags[]', tag));
-      }
-
-      console.log("Uploading to:", "http://127.0.0.1:8000/api/assets/");
-      console.log("=== FormData Contents ===");
-      for (let pair of fileFormData.entries()) {
-        console.log(pair[0], ':', pair[1]);
+      if (formData.tags.length > 0) {
+        formData.tags.forEach((tag) => fileFormData.append('tags[]', tag));
       }
 
       const res = await fetch("http://127.0.0.1:8000/api/assets/", {
@@ -242,34 +269,17 @@ export default function RegisterAssetPage() {
         body: fileFormData,
       });
 
-      let data: any = null;
-      const contentType = res.headers.get("content-type") || "";
-      if (contentType.includes("application/json")) {
-        data = await res.json();
-      } else {
-        const responseText = await res.text();
-        console.log("Response status:", res.status);
-        console.log("Response text:", responseText);
-        try {
-          data = JSON.parse(responseText);
-        } catch {
-          data = { message: responseText };
-        }
-      }
+      clearInterval(progressInterval);
+      setUploadProgress(100);
 
       if (!res.ok) {
-        const details = data?.details;
-        const firstError = details
-          ? Object.entries(details)
-              .map(([field, msgs]: any) => `${field}: ${Array.isArray(msgs) ? msgs.join(', ') : JSON.stringify(msgs)}`)
-              .join('\n')
-          : (data?.detail || data?.error || data?.message || `HTTP error! status: ${res.status}`);
-        throw new Error(firstError);
+        const data = await res.json();
+        throw new Error(data.error || 'Upload failed');
       }
 
       toast({
-        title: "Asset uploaded successfully!",
-        description: `${formData.name} has been registered`,
+        title: "Success! 🎉",
+        description: `${formData.name} has been uploaded`,
         status: "success",
         duration: 4000,
         isClosable: true,
@@ -282,10 +292,12 @@ export default function RegisterAssetPage() {
         name: "",
         description: "",
         category: "",
-        tags: "",
+        tags: [],
         keywords: "",
         is_public: true,
       });
+      setCurrentStep(1);
+      setUploadProgress(0);
 
       setTimeout(() => {
         router.push("/dashboard");
@@ -293,6 +305,7 @@ export default function RegisterAssetPage() {
 
     } catch (err: any) {
       console.error("Upload error:", err);
+      setUploadProgress(0);
       
       toast({
         title: "Upload failed",
@@ -311,276 +324,716 @@ export default function RegisterAssetPage() {
   return (
     <Flex>
       <Sidebar />
-      <Box flex="1" p={8} bg="brand.50" minH="100vh" ml={{ base: "0", md: "60px" }}>
-        <Heading mb={6} color="gray.700">Register New Asset</Heading>
-        
-        <Grid templateColumns={{ base: "1fr", lg: "1fr 400px" }} gap={6}>
-          {/* Left Column - Form */}
-          <Box bg="white" p={6} borderRadius="xl" boxShadow="sm" border="1px" borderColor="brand.100">
-            <Heading size="md" mb={4} color="gray.700">Asset Information</Heading>
-            
-            {/* File Upload Area */}
-            <Box mb={4}>
-              <FormLabel color="gray.700">Upload File</FormLabel>
-              <Input
-                type="file"
-                display="none"
-                id="file-upload"
-                onChange={handleFileSelect}
-                accept="*/*"
-              />
-              <Box
-                as="label"
-                htmlFor="file-upload"
-                p={12}
-                border="2px dashed"
-                borderColor={selectedFile ? "green.400" : "brand.200"}
-                borderRadius="md"
-                textAlign="center"
-                cursor="pointer"
-                bg={selectedFile ? "green.50" : "brand.50"}
-                _hover={{ 
-                  bg: selectedFile ? "green.100" : "brand.100", 
-                  borderColor: "brand.300",
-                  transform: "translateY(-2px)",
-                  transition: "all 0.2s"
-                }}
-                onDrop={handleDrop}
-                onDragOver={(e: React.DragEvent) => {
-                  e.preventDefault(); // Only prevent default for dragOver
-                }}
-                display="flex"
-                flexDirection="column"
-                justifyContent="center"
-                minH="200px"
-                transition="all 0.2s"
-              >
-                {previewUrl ? (
-                  <VStack>
-                    <Image 
-                      src={previewUrl} 
-                      alt="Preview" 
-                      maxH="200px" 
-                      mx="auto" 
-                      borderRadius="md"
-                    />
-                    <Text fontSize="sm" color="gray.600">
-                      Click to change file
-                    </Text>
-                  </VStack>
-                ) : selectedFile ? (
-                  <VStack>
-                    <Icon as={fileTypeInfo?.icon} w={12} h={12} color={`${fileTypeInfo?.color}.500`} />
-                    <Text fontWeight="medium" color="gray.700">
-                      {selectedFile.name}
-                    </Text>
-                    <Badge colorScheme={fileTypeInfo?.color}>
-                      {fileTypeInfo?.label}
-                    </Badge>
-                    <Text fontSize="sm" color="gray.500">
-                      {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
-                    </Text>
-                    <Text fontSize="sm" color="gray.600">
-                      Click to change file
-                    </Text>
-                  </VStack>
-                ) : (
-                  <VStack spacing={3}>
-                    <Icon as={FiUpload} w={12} h={12} color="brand.200" />
-                    <VStack spacing={1}>
-                      <Text color="gray.700" fontWeight="medium">
-                        Click to upload or drag and drop
-                      </Text>
-                      <Text fontSize="sm" color="gray.500">
-                        Supports all file types • Max 100MB
-                      </Text>
-                    </VStack>
-                  </VStack>
-                )}
-              </Box>
-            </Box>
+      <Box 
+        flex="1" 
+        minH="100vh" 
+        ml={{ base: "0", md: "60px" }}
+        bgGradient="linear(to-br, brand.50, white, brand.100)"
+        position="relative"
+        overflow="hidden"
+      >
+        {/* Animated Background Elements */}
+        <Box
+          position="absolute"
+          top="-10%"
+          right="-5%"
+          w="500px"
+          h="500px"
+          borderRadius="full"
+          bgGradient="linear(to-br, brand.200, brand.300)"
+          opacity="0.1"
+          filter="blur(80px)"
+          zIndex="0"
+        />
+        <Box
+          position="absolute"
+          bottom="-10%"
+          left="-5%"
+          w="400px"
+          h="400px"
+          borderRadius="full"
+          bgGradient="linear(to-tr, blue.200, purple.200)"
+          opacity="0.1"
+          filter="blur(80px)"
+          zIndex="0"
+        />
 
-            {/* Category Dropdown */}
-            <FormControl mb={4}>
-              <FormLabel color="gray.700">Category</FormLabel>
-              <Select
-                placeholder="Select a category"
-                value={formData.category}
-                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                borderColor="brand.100"
-                _hover={{ borderColor: "brand.200" }}
-                _focus={{ borderColor: "brand.200", boxShadow: "0 0 0 1px var(--chakra-colors-brand-200)" }}
-              >
-                <option value="3D Models">3D Models</option>
-                <option value="Images">Images</option>
-                <option value="Videos">Videos</option>
-                <option value="Documents">Documents</option>
-                <option value="Other">Other</option>
-              </Select>
-            </FormControl>
-
-            {/* Asset Name */}
-            <FormControl mb={4} isRequired>
-              <FormLabel color="gray.700">Asset Name</FormLabel>
-              <Input
-                placeholder="e.g. Product Mockup, Logo Design"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                borderColor="brand.100"
-                _hover={{ borderColor: "brand.200" }}
-                _focus={{ borderColor: "brand.200", boxShadow: "0 0 0 1px var(--chakra-colors-brand-200)" }}
-              />
-            </FormControl>
-
-            {/* Description */}
-            <FormControl mb={4}>
-              <FormLabel color="gray.700">Description</FormLabel>
-              <Textarea
-                placeholder="Brief description of the asset..."
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                rows={4}
-                borderColor="brand.100"
-                _hover={{ borderColor: "brand.200" }}
-                _focus={{ borderColor: "brand.200", boxShadow: "0 0 0 1px var(--chakra-colors-brand-200)" }}
-              />
-            </FormControl>
-
-            {/* Tags */}
-            <FormControl mb={4}>
-              <FormLabel color="gray.700">Tags</FormLabel>
-              <Input
-                placeholder="e.g. design, mockup, product (comma-separated)"
-                value={formData.tags}
-                onChange={(e) => setFormData({ ...formData, tags: e.target.value })}
-                borderColor="brand.100"
-                _hover={{ borderColor: "brand.200" }}
-                _focus={{ borderColor: "brand.200", boxShadow: "0 0 0 1px var(--chakra-colors-brand-200)" }}
-              />
-              <FormHelperText color="gray.500">Separate tags with commas</FormHelperText>
-            </FormControl>
-
-            {/* Keywords */}
-            <FormControl mb={4}>
-              <FormLabel color="gray.700">Keywords</FormLabel>
-              <Input
-                placeholder="Search keywords..."
-                value={formData.keywords}
-                onChange={(e) => setFormData({ ...formData, keywords: e.target.value })}
-                borderColor="brand.100"
-                _hover={{ borderColor: "brand.200" }}
-                _focus={{ borderColor: "brand.200", boxShadow: "0 0 0 1px var(--chakra-colors-brand-200)" }}
-              />
-            </FormControl>
-
-            {/* Public/Private Toggle */}
-            <FormControl display="flex" alignItems="center" mb={6}>
-              <FormLabel mb="0" color="gray.700">Make Public</FormLabel>
-              <Switch
-                isChecked={formData.is_public}
-                onChange={(e) => setFormData({ ...formData, is_public: e.target.checked })}
-                colorScheme="brand"
-              />
-            </FormControl>
-
-            {/* Action Buttons */}
-            <Flex gap={3}>
-              <Button
-                colorScheme="brand"
-                leftIcon={<Icon as={FiUpload} />}
-                onClick={handleUpload}
-                isLoading={uploading}
-                loadingText="Uploading..."
-                flex="1"
-                isDisabled={!selectedFile}
-                bg="brand.200"
-                color="white"
-                _hover={{ bg: "brand.300" }}
-                _active={{ bg: "brand.200" }}
-              >
-                Save Asset
-              </Button>
-              <Button
-                colorScheme="gray"
-                variant="outline"
-                onClick={() => {
-                  setSelectedFile(null);
-                  setPreviewUrl("");
-                  setFormData({
-                    name: "",
-                    description: "",
-                    category: "",
-                    tags: "",
-                    keywords: "",
-                    is_public: true,
-                  });
-                }}
-                borderColor="brand.100"
-                _hover={{ bg: "brand.50", borderColor: "brand.200" }}
-              >
-                Clear
-              </Button>
+        <Container maxW="7xl" py={8} position="relative" zIndex="1">
+          {/* Header */}
+          <MotionBox
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            mb={8}
+          >
+            <Flex justify="space-between" align="center" mb={2}>
+              <VStack align="start" spacing={1}>
+                <Heading 
+                  bgGradient="linear(to-r, brand.200, purple.500)" 
+                  bgClip="text"
+                  fontSize="4xl"
+                  fontWeight="black"
+                >
+                  Upload New Asset
+                </Heading>
+                <Text color="gray.600" fontSize="lg">
+                  Share your creative work with the team
+                </Text>
+              </VStack>
+              
+              {/* Step Indicator */}
+              <HStack spacing={3}>
+                <Flex align="center">
+                  <Circle step={1} current={currentStep} label="Upload" />
+                  <Divider w="50px" />
+                  <Circle step={2} current={currentStep} label="Details" />
+                  <Divider w="50px" />
+                  <Circle step={3} current={currentStep >= 2 ? 3 : currentStep} label="Done" />
+                </Flex>
+              </HStack>
             </Flex>
-          </Box>
+          </MotionBox>
 
-          {/* Right Column - Preview/Info */}
-          <Box bg="white" p={6} borderRadius="xl" boxShadow="sm" height="fit-content" border="1px" borderColor="brand.100">
-            <Heading size="md" mb={4} color="gray.700">File Information</Heading>
-            {selectedFile ? (
-              <VStack align="stretch" spacing={4}>
-                <Flex justify="space-between" align="center">
-                  <Text color="gray.600">File Name:</Text>
-                  <Text fontWeight="medium" maxW="200px" isTruncated color="gray.700">
-                    {selectedFile.name}
-                  </Text>
-                </Flex>
-                
-                <Flex justify="space-between">
-                  <Text color="gray.600">File Type:</Text>
-                  <Badge colorScheme={fileTypeInfo?.color}>
-                    {fileTypeInfo?.label}
-                  </Badge>
-                </Flex>
-                
-                <Flex justify="space-between">
-                  <Text color="gray.600">Size:</Text>
-                  <Text color="gray.700">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</Text>
-                </Flex>
-                
-                <Flex justify="space-between">
-                  <Text color="gray.600">MIME Type:</Text>
-                  <Text fontSize="sm" fontFamily="mono" color="gray.700">
-                    {selectedFile.type || "unknown"}
-                  </Text>
-                </Flex>
-                
-                <Divider borderColor="brand.100" />
-                
-                <Box>
-                  <Text color="gray.600" mb={2}>Supported 3D Formats:</Text>
-                  <HStack spacing={2} flexWrap="wrap">
-                    {['GLB', 'GLTF', 'OBJ', 'FBX', 'STL'].map(format => (
-                      <Badge key={format} colorScheme="purple" variant="subtle" bg="brand.50" color="brand.200">
-                        {format}
-                      </Badge>
-                    ))}
-                  </HStack>
-                </Box>
-              </VStack>
-            ) : (
-              <VStack spacing={4} py={8}>
-                <Icon as={FiFile} w={12} h={12} color="brand.100" />
-                <Text color="gray.500" textAlign="center">
-                  No file selected
-                </Text>
-                <Text fontSize="sm" color="gray.400" textAlign="center">
-                  Upload a file to see details
-                </Text>
-              </VStack>
-            )}
-          </Box>
-        </Grid>
+          <Grid templateColumns={{ base: "1fr", lg: "2fr 1fr" }} gap={6}>
+            {/* Main Upload Area */}
+            <VStack spacing={6} align="stretch">
+              {/* File Upload Card */}
+              <MotionBox
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.1 }}
+              >
+                <Card
+                  bg="white"
+                  borderRadius="2xl"
+                  boxShadow="xl"
+                  border="1px"
+                  borderColor="gray.100"
+                  overflow="hidden"
+                >
+                  <CardBody p={0}>
+                    <Input
+                      type="file"
+                      display="none"
+                      id="file-upload"
+                      onChange={handleFileSelect}
+                      accept="*/*"
+                    />
+                    
+                    <Box
+                      as="label"
+                      htmlFor="file-upload"
+                      cursor="pointer"
+                      position="relative"
+                      minH="350px"
+                      display="flex"
+                      alignItems="center"
+                      justifyContent="center"
+                      onDrop={handleDrop}
+                      onDragOver={handleDragOver}
+                      onDragLeave={handleDragLeave}
+                      bgGradient={isDragging 
+                        ? "linear(to-br, brand.100, blue.100)" 
+                        : selectedFile 
+                        ? "linear(to-br, white, gray.50)"
+                        : "linear(to-br, gray.50, white)"
+                      }
+                      transition="all 0.3s"
+                      _hover={{
+                        transform: "scale(1.01)",
+                        boxShadow: "lg"
+                      }}
+                    >
+                      <AnimatePresence mode="wait">
+                        {previewUrl ? (
+                          <MotionBox
+                            key="preview"
+                            initial={{ opacity: 0, scale: 0.9 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.9 }}
+                            w="full"
+                            h="full"
+                            position="relative"
+                          >
+                            <Image 
+                              src={previewUrl} 
+                              alt="Preview" 
+                              maxH="350px" 
+                              w="full"
+                              objectFit="contain"
+                              p={4}
+                            />
+                            <Badge
+                              position="absolute"
+                              top={4}
+                              right={4}
+                              colorScheme={fileTypeInfo?.color}
+                              fontSize="sm"
+                              px={3}
+                              py={1}
+                              borderRadius="full"
+                            >
+                              {fileTypeInfo?.label}
+                            </Badge>
+                          </MotionBox>
+                        ) : selectedFile ? (
+                          <MotionFlex
+                            key="file-info"
+                            initial={{ opacity: 0, scale: 0.9 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.9 }}
+                            direction="column"
+                            align="center"
+                            gap={4}
+                            p={8}
+                          >
+                            <Box
+                              p={6}
+                              borderRadius="full"
+                              bgGradient={fileTypeInfo?.gradient}
+                            >
+                              <Icon as={fileTypeInfo?.icon} w={16} h={16} color="white" />
+                            </Box>
+                            <VStack spacing={2}>
+                              <Text fontWeight="bold" fontSize="xl" color="gray.700">
+                                {selectedFile.name}
+                              </Text>
+                              <Badge colorScheme={fileTypeInfo?.color} fontSize="md" px={3} py={1}>
+                                {fileTypeInfo?.label}
+                              </Badge>
+                              <Text fontSize="sm" color="gray.500">
+                                {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
+                              </Text>
+                            </VStack>
+                            <Text fontSize="sm" color="gray.600" mt={4}>
+                              Click or drag to change file
+                            </Text>
+                          </MotionFlex>
+                        ) : (
+                          <MotionFlex
+                            key="upload-prompt"
+                            initial={{ opacity: 0, scale: 0.9 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.9 }}
+                            direction="column"
+                            align="center"
+                            gap={4}
+                            p={8}
+                          >
+                            <Box
+                              p={8}
+                              borderRadius="full"
+                              bgGradient="linear(to-br, brand.200, purple.400)"
+                              boxShadow="lg"
+                            >
+                              <Icon as={FiUpload} w={16} h={16} color="white" />
+                            </Box>
+                            <VStack spacing={2}>
+                              <Text fontWeight="bold" fontSize="2xl" color="gray.700">
+                                Drop your file here
+                              </Text>
+                              <Text color="gray.500" fontSize="lg">
+                                or click to browse
+                              </Text>
+                            </VStack>
+                            <HStack spacing={2} mt={4}>
+                              {categories.map((cat) => (
+                                <Badge
+                                  key={cat.value}
+                                  colorScheme={cat.color.split('.')[0]}
+                                  fontSize="xs"
+                                  px={2}
+                                  py={1}
+                                >
+                                  {cat.emoji} {cat.value}
+                                </Badge>
+                              ))}
+                            </HStack>
+                            <Text fontSize="sm" color="gray.400" mt={2}>
+                              Maximum file size: 100MB
+                            </Text>
+                          </MotionFlex>
+                        )}
+                      </AnimatePresence>
+                    </Box>
+                  </CardBody>
+                </Card>
+              </MotionBox>
+
+              {/* Form Fields */}
+              <AnimatePresence>
+                {selectedFile && (
+                  <MotionBox
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                  >
+                    <Card
+                      bg="white"
+                      borderRadius="2xl"
+                      boxShadow="xl"
+                      border="1px"
+                      borderColor="gray.100"
+                    >
+                      <CardBody p={6}>
+                        <VStack spacing={5} align="stretch">
+                          {/* Category Selection */}
+                          <FormControl>
+                            <FormLabel fontWeight="semibold" color="gray.700">
+                              Category
+                            </FormLabel>
+                            <Grid templateColumns="repeat(5, 1fr)" gap={3}>
+                              {categories.map((cat) => (
+                                <Box
+                                  key={cat.value}
+                                  p={4}
+                                  borderRadius="xl"
+                                  border="2px"
+                                  borderColor={formData.category === cat.value ? cat.color : "gray.200"}
+                                  bg={formData.category === cat.value ? `${cat.color.split('.')[0]}.50` : "white"}
+                                  cursor="pointer"
+                                  onClick={() => setFormData({ ...formData, category: cat.value })}
+                                  transition="all 0.2s"
+                                  _hover={{ transform: "translateY(-2px)", boxShadow: "md" }}
+                                  textAlign="center"
+                                >
+                                  <Text fontSize="2xl" mb={1}>{cat.emoji}</Text>
+                                  <Text fontSize="xs" fontWeight="medium" color="gray.600">
+                                    {cat.value.split(' ')[0]}
+                                  </Text>
+                                </Box>
+                              ))}
+                            </Grid>
+                          </FormControl>
+
+                          {/* Asset Name */}
+                          <FormControl isRequired>
+                            <FormLabel fontWeight="semibold" color="gray.700">
+                              Asset Name
+                            </FormLabel>
+                            <Input
+                              value={formData.name}
+                              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                              placeholder="Give your asset a memorable name..."
+                              size="lg"
+                              borderRadius="xl"
+                              borderColor="gray.200"
+                              _hover={{ borderColor: "brand.200" }}
+                              _focus={{ borderColor: "brand.200", boxShadow: "0 0 0 1px var(--chakra-colors-brand-200)" }}
+                            />
+                          </FormControl>
+
+                          {/* Description */}
+                          <FormControl>
+                            <FormLabel fontWeight="semibold" color="gray.700">
+                              Description
+                            </FormLabel>
+                            <Textarea
+                              value={formData.description}
+                              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                              placeholder="Describe what makes this asset special..."
+                              rows={4}
+                              borderRadius="xl"
+                              borderColor="gray.200"
+                              _hover={{ borderColor: "brand.200" }}
+                              _focus={{ borderColor: "brand.200", boxShadow: "0 0 0 1px var(--chakra-colors-brand-200)" }}
+                            />
+                          </FormControl>
+
+                          {/* Tags */}
+                          <FormControl>
+                            <FormLabel fontWeight="semibold" color="gray.700">
+                              Tags
+                            </FormLabel>
+                            <InputGroup size="lg">
+                              <Input
+                                value={newTag}
+                                onChange={(e) => setNewTag(e.target.value)}
+                                onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())}
+                                placeholder="Add tags to organize your asset..."
+                                borderRadius="xl"
+                                borderColor="gray.200"
+                                _hover={{ borderColor: "brand.200" }}
+                                _focus={{ borderColor: "brand.200", boxShadow: "0 0 0 1px var(--chakra-colors-brand-200)" }}
+                              />
+                              <InputRightElement width="4.5rem">
+                                <Button
+                                  h="1.75rem"
+                                  size="sm"
+                                  onClick={addTag}
+                                  colorScheme="brand"
+                                  borderRadius="lg"
+                                >
+                                  <Icon as={FiPlus} />
+                                </Button>
+                              </InputRightElement>
+                            </InputGroup>
+                            
+                            {formData.tags.length > 0 && (
+                              <Wrap mt={3}>
+                                {formData.tags.map((tag, index) => (
+                                  <WrapItem key={index}>
+                                    <Tag
+                                      size="lg"
+                                      borderRadius="full"
+                                      variant="solid"
+                                      colorScheme="brand"
+                                    >
+                                      <TagLabel>{tag}</TagLabel>
+                                      <TagCloseButton onClick={() => removeTag(tag)} />
+                                    </Tag>
+                                  </WrapItem>
+                                ))}
+                              </Wrap>
+                            )}
+                          </FormControl>
+
+                          {/* Advanced Options */}
+                          <Box>
+                            <Button
+                              variant="ghost"
+                              onClick={toggleAdvanced}
+                              rightIcon={<Icon as={showAdvanced ? FiChevronUp : FiChevronDown} />}
+                              w="full"
+                              justifyContent="space-between"
+                            >
+                              Advanced Options
+                            </Button>
+                            
+                            <Collapse in={showAdvanced} animateOpacity>
+                              <VStack spacing={4} mt={4} p={4} bg="gray.50" borderRadius="xl">
+                                <FormControl>
+                                  <FormLabel fontSize="sm" fontWeight="semibold" color="gray.700">
+                                    Keywords (SEO)
+                                  </FormLabel>
+                                  <Input
+                                    value={formData.keywords}
+                                    onChange={(e) => setFormData({ ...formData, keywords: e.target.value })}
+                                    placeholder="Comma-separated keywords..."
+                                    size="md"
+                                    borderRadius="lg"
+                                  />
+                                </FormControl>
+
+                                <FormControl display="flex" alignItems="center" justifyContent="space-between">
+                                  <HStack>
+                                    <Icon as={FiInfo} color="blue.500" />
+                                    <FormLabel mb="0" fontSize="sm" fontWeight="semibold">
+                                      Make this asset public
+                                    </FormLabel>
+                                  </HStack>
+                                  <Switch
+                                    isChecked={formData.is_public}
+                                    onChange={(e) => setFormData({ ...formData, is_public: e.target.checked })}
+                                    colorScheme="brand"
+                                    size="lg"
+                                  />
+                                </FormControl>
+                              </VStack>
+                            </Collapse>
+                          </Box>
+                        </VStack>
+                      </CardBody>
+                    </Card>
+                  </MotionBox>
+                )}
+              </AnimatePresence>
+
+              {/* Upload Progress */}
+              <AnimatePresence>
+                {uploading && (
+                  <MotionBox
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                  >
+                    <Card bg="white" borderRadius="2xl" boxShadow="xl">
+                      <CardBody>
+                        <VStack spacing={3}>
+                          <Text fontWeight="semibold">Uploading your asset...</Text>
+                          <Progress
+                            value={uploadProgress}
+                            size="lg"
+                            colorScheme="brand"
+                            borderRadius="full"
+                            w="full"
+                            hasStripe
+                            isAnimated
+                          />
+                          <Text fontSize="sm" color="gray.600">{uploadProgress}% Complete</Text>
+                        </VStack>
+                      </CardBody>
+                    </Card>
+                  </MotionBox>
+                )}
+              </AnimatePresence>
+
+              {/* Action Buttons */}
+              <AnimatePresence>
+                {selectedFile && !uploading && (
+                  <MotionBox
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                  >
+                    <HStack spacing={4}>
+                      <Button
+                        size="lg"
+                        leftIcon={<Icon as={FiSave} />}
+                        onClick={handleUpload}
+                        bgGradient="linear(to-r, brand.200, purple.500)"
+                        color="white"
+                        _hover={{
+                          bgGradient: "linear(to-r, brand.300, purple.600)",
+                          transform: "translateY(-2px)",
+                          boxShadow: "xl"
+                        }}
+                        flex={1}
+                        h="60px"
+                        borderRadius="xl"
+                        fontSize="lg"
+                        fontWeight="bold"
+                      >
+                        Upload Asset
+                      </Button>
+                      
+                      <Button
+                        size="lg"
+                        variant="outline"
+                        leftIcon={<Icon as={FiX} />}
+                        onClick={() => {
+                          setSelectedFile(null);
+                          setPreviewUrl("");
+                          setFormData({
+                            name: "",
+                            description: "",
+                            category: "",
+                            tags: [],
+                            keywords: "",
+                            is_public: true,
+                          });
+                          setCurrentStep(1);
+                        }}
+                        borderColor="gray.300"
+                        color="gray.600"
+                        _hover={{ bg: "gray.100" }}
+                        h="60px"
+                        borderRadius="xl"
+                        px={8}
+                      >
+                        Cancel
+                      </Button>
+                    </HStack>
+                  </MotionBox>
+                )}
+              </AnimatePresence>
+            </VStack>
+
+            {/* Sidebar Info */}
+            <VStack spacing={6} align="stretch">
+              {/* File Info Card */}
+              <MotionBox
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.2 }}
+              >
+                <Card bg="white" borderRadius="2xl" boxShadow="xl" border="1px" borderColor="gray.100">
+                  <CardBody>
+                    <VStack align="stretch" spacing={4}>
+                      <Flex align="center" gap={2}>
+                        <Icon as={FiInfo} color="brand.200" w={5} h={5} />
+                        <Text fontWeight="bold" fontSize="lg">File Information</Text>
+                      </Flex>
+                      
+                      {selectedFile ? (
+                        <VStack align="stretch" spacing={3} divider={<Box borderColor="gray.100" />}>
+                          <InfoRow label="File Name" value={selectedFile.name} />
+                          <InfoRow 
+                            label="Type"
+                                                        value={fileTypeInfo?.label || 'Unknown'}
+                            badgeColor={fileTypeInfo?.color}
+                          />
+                          <InfoRow label="Size" value={`${(selectedFile.size / 1024 / 1024).toFixed(2)} MB`} />
+                          <InfoRow label="MIME Type" value={selectedFile.type || 'Unknown'} />
+                          <InfoRow label="Last Modified" value={new Date(selectedFile.lastModified).toLocaleDateString()} />
+                        </VStack>
+                      ) : (
+                        <VStack spacing={3} py={4}>
+                          <Icon as={FiFile} w={12} h={12} color="gray.300" />
+                          <Text color="gray.500" textAlign="center">
+                            No file selected
+                          </Text>
+                          <Text fontSize="sm" color="gray.400" textAlign="center">
+                            Upload a file to see details
+                          </Text>
+                        </VStack>
+                      )}
+                    </VStack>
+                  </CardBody>
+                </Card>
+              </MotionBox>
+
+              {/* Supported Formats Card */}
+              <MotionBox
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.3 }}
+              >
+                <Card bg="white" borderRadius="2xl" boxShadow="xl" border="1px" borderColor="gray.100">
+                  <CardBody>
+                    <VStack align="stretch" spacing={4}>
+                      <Flex align="center" gap={2}>
+                        <Icon as={FiBox} color="purple.500" w={5} h={5} />
+                        <Text fontWeight="bold" fontSize="lg">Supported Formats</Text>
+                      </Flex>
+                      
+                      <VStack align="stretch" spacing={3}>
+                        <FormatSection 
+                          title="3D Models" 
+                          formats={['GLB', 'GLTF', 'OBJ', 'FBX', 'STL', 'DAE', '3DS']} 
+                          color="purple" 
+                        />
+                        <FormatSection 
+                          title="Images" 
+                          formats={['JPG', 'JPEG', 'PNG', 'GIF', 'WEBP', 'SVG', 'BMP']} 
+                          color="green" 
+                        />
+                        <FormatSection 
+                          title="Videos" 
+                          formats={['MP4', 'MOV', 'AVI', 'WEBM', 'MKV', 'WMV']} 
+                          color="red" 
+                        />
+                        <FormatSection 
+                          title="Documents" 
+                          formats={['PDF', 'DOC', 'DOCX', 'TXT', 'PPT', 'PPTX']} 
+                          color="blue" 
+                        />
+                      </VStack>
+                    </VStack>
+                  </CardBody>
+                </Card>
+              </MotionBox>
+
+              {/* Quick Tips Card */}
+              <MotionBox
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.4 }}
+              >
+                <Card bg="white" borderRadius="2xl" boxShadow="xl" border="1px" borderColor="gray.100">
+                  <CardBody>
+                    <VStack align="stretch" spacing={4}>
+                      <Flex align="center" gap={2}>
+                        <Icon as={FiAlertCircle} color="orange.500" w={5} h={5} />
+                        <Text fontWeight="bold" fontSize="lg">Upload Tips</Text>
+                      </Flex>
+                      
+                      <VStack align="stretch" spacing={3}>
+                        <TipItem 
+                          icon={FiCheck}
+                          text="Use descriptive names for better searchability"
+                        />
+                        <TipItem 
+                          icon={FiCheck}
+                          text="Add relevant tags to help others find your asset"
+                        />
+                        <TipItem 
+                          icon={FiCheck}
+                          text="Include keywords for improved SEO"
+                        />
+                        <TipItem 
+                          icon={FiCheck}
+                          text="Choose the right category for organization"
+                        />
+                        <TipItem 
+                          icon={FiCheck}
+                          text="Keep file sizes under 100MB for faster uploads"
+                        />
+                      </VStack>
+                    </VStack>
+                  </CardBody>
+                </Card>
+              </MotionBox>
+            </VStack>
+          </Grid>
+        </Container>
       </Box>
     </Flex>
   );
 }
+
+// Helper Components
+const Circle = ({ step, current, label }: { step: number; current: number; label: string }) => (
+  <VStack spacing={1}>
+    <Flex
+      w="40px"
+      h="40px"
+      borderRadius="full"
+      align="center"
+      justify="center"
+      bg={current >= step ? "brand.200" : "gray.200"}
+      color={current >= step ? "white" : "gray.500"}
+      fontWeight="bold"
+      fontSize="sm"
+      position="relative"
+    >
+      {current > step ? <Icon as={FiCheck} /> : step}
+    </Flex>
+    <Text fontSize="xs" color={current >= step ? "brand.200" : "gray.500"} fontWeight="medium">
+      {label}
+    </Text>
+  </VStack>
+);
+
+const Divider = ({ w }: { w: string }) => (
+  <Box w={w} h="2px" bg="gray.200" mx={1} />
+);
+
+const InfoRow = ({ label, value, badgeColor }: { label: string; value: string; badgeColor?: string }) => (
+  <Flex justify="space-between" align="center">
+    <Text fontSize="sm" color="gray.600" fontWeight="medium">
+      {label}
+    </Text>
+    {badgeColor ? (
+      <Badge colorScheme={badgeColor} fontSize="xs" px={2} py={1}>
+        {value}
+      </Badge>
+    ) : (
+      <Text fontSize="sm" color="gray.700" maxW="150px" isTruncated>
+        {value}
+      </Text>
+    )}
+  </Flex>
+);
+
+const FormatSection = ({ title, formats, color }: { title: string; formats: string[]; color: string }) => (
+  <Box>
+    <Text fontSize="sm" fontWeight="semibold" color="gray.700" mb={2}>
+      {title}
+    </Text>
+    <Wrap spacing={2}>
+      {formats.map((format) => (
+        <WrapItem key={format}>
+          <Badge
+            colorScheme={color}
+            variant="subtle"
+            fontSize="xs"
+            px={2}
+            py={1}
+            borderRadius="md"
+          >
+            {format}
+          </Badge>
+        </WrapItem>
+      ))}
+    </Wrap>
+  </Box>
+);
+
+const TipItem = ({ icon, text }: { icon: any; text: string }) => (
+  <HStack spacing={3} align="start">
+    <Icon as={icon} w={4} h={4} color="green.500" mt={0.5} />
+    <Text fontSize="sm" color="gray.600" lineHeight="tall">
+      {text}
+    </Text>
+  </HStack>
+);
