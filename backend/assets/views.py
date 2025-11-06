@@ -1,5 +1,5 @@
 from rest_framework import viewsets, status
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser
@@ -9,6 +9,8 @@ from users.permissions import IsAdmin, IsEditorOrAdmin, IsViewerOrHigher
 from activitylog.models import ActivityLog  
 import json
 from django.db.models import Sum, Count
+from .utils import calculate_image_hash, compare_image_sets
+import io
 
 class AssetViewSet(viewsets.ModelViewSet):
     queryset = Asset.objects.all()
@@ -177,7 +179,28 @@ class AssetViewSet(viewsets.ModelViewSet):
             description=f"Uploaded asset '{asset.name}' ({asset.file_type}) [id={asset.id}]",
             ip_address=self.request.META.get('REMOTE_ADDR'),
         )
-
+        asset = serializer.save(user=self.request.user)
+        
+        # Hashing- If it's an image, calculate hash
+        if asset.file_type == 'IMG':
+            try:
+                from .utils import calculate_image_hash, get_dominant_colors
+                
+                hashes = calculate_image_hash(asset.file.path)
+                if hashes:
+                    asset.average_hash = hashes['average_hash']
+                    asset.perceptual_hash = hashes['perceptual_hash']
+                    asset.difference_hash = hashes['difference_hash']
+                    
+                    # Extract dominant colors
+                    colors = get_dominant_colors(asset.file.path)
+                    if colors:
+                        asset.dominant_colors = colors
+                    
+                    asset.save()
+            except Exception as e:
+                print(f"Error calculating hash for new asset: {e}")
+        
         return asset
 
     def perform_update(self, serializer):
@@ -343,3 +366,133 @@ class AssetViewSet(viewsets.ModelViewSet):
         recent_assets = recent_assets.order_by('-created_at')[:10]
         serializer = self.get_serializer(recent_assets, many=True)
         return Response(serializer.data)
+    
+
+
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
+    def search_by_image(self, request):
+        """
+        Upload an image and find visually similar assets by hash.
+        """
+        print("=== Image Search Request Received ===")
+        print("User:", request.user)
+        print("Files:", dict(request.FILES))
+        
+        if 'image' not in request.FILES:
+            print("❌ No image file in request")
+            return Response({'error': 'No image file provided'}, status=status.HTTP_400_BAD_REQUEST)
+
+        uploaded_image = request.FILES['image']
+        print(f"Uploaded image: {uploaded_image.name}, {uploaded_image.content_type}, {uploaded_image.size} bytes")
+
+        if not uploaded_image.content_type.startswith('image/'):
+            print(f"❌ Not an image file: {uploaded_image.content_type}")
+            return Response({'error': 'File must be an image'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            # Calculate hashes for uploaded image
+            print("🔍 Calculating image hashes...")
+            image_hashes = calculate_image_hash(uploaded_image)
+            print("✅ Hashes calculated:", image_hashes)
+            
+            if not image_hashes:
+                print("❌ Failed to calculate image hashes")
+                return Response({'error': 'Failed to process image'}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Fetch image assets that have hashes calculated
+            image_assets = Asset.objects.filter(
+                file_type='IMG'
+            ).exclude(
+                average_hash__isnull=True
+            ).exclude(
+                average_hash=''
+            )
+            
+            print(f"📊 Found {image_assets.count()} image assets with hashes")
+
+            results = []
+            for asset in image_assets:
+                try:
+                    # Prepare asset's hash set for comparison
+                    asset_hashes = {
+                        'average_hash': asset.average_hash,
+                        'perceptual_hash': asset.perceptual_hash,
+                        'difference_hash': asset.difference_hash
+                    }
+                    
+                    # Compare using all three hash types
+                    similarity = compare_image_sets(image_hashes, asset_hashes)
+                    
+                    if similarity >= 70:  # similarity threshold
+                        results.append({
+                            'asset': asset, 
+                            'similarity': round(similarity, 2)
+                        })
+                        print(f"✅ Match found: {asset.name} - {similarity}%")
+                        
+                except Exception as e:
+                    print(f"❌ Error comparing asset {asset.id}: {e}")
+                    continue
+
+            # Sort by similarity (highest first) and limit results
+            results.sort(key=lambda x: x['similarity'], reverse=True)
+            results = results[:20]
+
+            # Serialize results
+            response_data = []
+            for r in results:
+                data = AssetSerializer(r['asset'], context={'request': request}).data
+                data['similarity_score'] = r['similarity']
+                response_data.append(data)
+
+            print(f"🎉 Search completed: {len(response_data)} results found")
+            
+            return Response({
+                'count': len(response_data), 
+                'results': response_data,
+            })
+            
+        except Exception as e:
+            print(f"💥 Unexpected error in search_by_image: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return Response(
+                {'error': f'Search failed: {str(e)}'}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    @action(detail=False, methods=['post'], permission_classes=[IsAdmin])
+    def reindex_images(self, request):
+        """
+        Admin endpoint to recalculate hashes for all images.
+        Useful after adding the feature or fixing corrupted hashes.
+        """
+        image_assets = Asset.objects.filter(file_type='IMG')
+        updated_count = 0
+        failed_count = 0
+
+        for asset in image_assets:
+            try:
+                hashes = calculate_image_hash(asset.file.path)
+                if hashes:
+                    asset.average_hash = hashes['average_hash']
+                    asset.perceptual_hash = hashes['perceptual_hash']
+                    asset.difference_hash = hashes['difference_hash']
+
+                    colors = get_dominant_colors(asset.file.path)
+                    if colors:
+                        asset.dominant_colors = colors
+
+                    asset.save()
+                    updated_count += 1
+                    print(f"[Reindex] ✅ {asset.name} reindexed")
+            except Exception as e:
+                print(f"[Reindex] ❌ Failed {asset.name}: {e}")
+                failed_count += 1
+
+        return Response({
+            'message': 'Image reindexing complete',
+            'updated': updated_count,
+            'failed': failed_count,
+            'total': image_assets.count()
+        })

@@ -27,6 +27,7 @@ import {
   Input,
   InputGroup,
   InputLeftElement,
+  Icon,
 } from "@chakra-ui/react";
 import { Worker, Viewer } from "@react-pdf-viewer/core";
 import "@react-pdf-viewer/core/lib/styles/index.css";
@@ -34,11 +35,12 @@ import "@react-pdf-viewer/default-layout/lib/styles/index.css";
 import Sidebar from "@/components/Sidebar";
 import { useRouter } from "next/navigation";
 import { EditIcon, DownloadIcon, SearchIcon } from "@chakra-ui/icons";
+import { FiImage } from "react-icons/fi";
 
 import AssetFilters from "@/components/AssetFilters";
 import EditAssetModal from "@/components/EditAssetModal";
 import FavoriteButton from "@/components/FavoriteButton";
-import DashboardStatsWidget from "@/components/DashboardStatsWidget";
+import ImageSearchModal from "@/components/ImageSearchModal";
 
 const BabylonViewer = lazy(() => import("@/components/BabylonViewer"));
 
@@ -67,6 +69,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
+
 
   const [filters, setFilters] = useState({
     search: "",
@@ -277,6 +280,12 @@ export default function Dashboard() {
     return `http://127.0.0.1:8000${fileUrl}`;
   };
 
+  const { 
+    isOpen: isImageSearchOpen, 
+    onOpen: onImageSearchOpen, 
+    onClose: onImageSearchClose 
+  } = useDisclosure();
+
   if (!role) {
     return (
       <Flex justify="center" align="center" minH="100vh">
@@ -323,7 +332,17 @@ export default function Dashboard() {
             </Text>
           )}
         </Box>
-
+        
+        {/* Image Search Button */}
+        <Button
+          leftIcon={<Icon as={FiImage} />}
+          colorScheme="purple"
+          onClick={onImageSearchOpen}
+          size="lg"
+        >
+          Search by Image
+        </Button>
+  
         {/* Search and Filter Component */}
         <AssetFilters
           onFiltersChange={setFilters}
@@ -644,6 +663,20 @@ export default function Dashboard() {
           </ModalContent>
         </Modal>
 
+        <ImageSearchModal
+          isOpen={isImageSearchOpen}
+          onClose={onImageSearchClose}
+          onSelectAsset={(assetId) => {
+            // Find and preview the selected asset
+            const asset = assets.find(a => a.id === assetId);
+            if (asset) {
+              setSelectedAsset(asset);
+              onOpen(); // Opens the preview modal
+            }
+            onImageSearchClose();
+          }}
+        />
+
         {/* Edit Asset Modal */}
         <EditAssetModal
           isOpen={!!editingAsset}
@@ -651,6 +684,7 @@ export default function Dashboard() {
           asset={editingAsset}
           onSave={handleUpdateAsset}
           availableCategories={availableCategories}
+              
         />
       </Box>
     </Flex>
