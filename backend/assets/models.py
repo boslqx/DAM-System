@@ -30,11 +30,12 @@ class Asset(models.Model):
         blank=True
     )
 
-    # Image hash fields for reverse image search
+    #Image hash fields image-based search
     average_hash = models.CharField(max_length=64, blank=True, null=True)
     perceptual_hash = models.CharField(max_length=64, blank=True, null=True)
     difference_hash = models.CharField(max_length=64, blank=True, null=True)
-    dominant_colors = models.JSONField(blank=True, null=True)  # Store RGB values
+    dominant_colors = models.JSONField(blank=True, null=True) 
+
     # 3D-specific data
     preview_url = models.URLField(blank=True, null=True)
     polygon_count = models.IntegerField(blank=True, null=True)

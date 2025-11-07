@@ -4,15 +4,13 @@ import numpy as np
 from sklearn.cluster import KMeans
 import io  
 
+#Calculate perceptual hashing, EXIF rotation, & resizing
 def calculate_image_hash(image_file):
-    """
-    Calculates consistent perceptual hashes for both uploaded file streams and file paths.
-    Handles EXIF rotation, resizes, and ensures identical results between uploads and stored images.
-    """
+
     try:
         print(f"[calculate_image_hash] Processing image file: {type(image_file)}")
         
-        # Handle both UploadedFile and file path
+        #Handle both UploadedFile and file path
         if hasattr(image_file, 'read'):
             print("[calculate_image_hash] Handling file upload")
             image_file.seek(0)
@@ -23,10 +21,10 @@ def calculate_image_hash(image_file):
             print(f"[calculate_image_hash] Handling file path: {image_file}")
             img = Image.open(image_file)
 
-        # Fix orientation based on EXIF (prevents rotated hash mismatch)
+        #Fix orientation based on EXIF
         img = ImageOps.exif_transpose(img)
 
-        # Convert to RGB and resize
+        #Convert to RGB and resize
         img = img.convert('RGB')
         img = img.resize((256, 256))
         
@@ -44,8 +42,9 @@ def calculate_image_hash(image_file):
         return None
 
 
+#Dominant colors
 def get_dominant_colors(image_file, num_colors=5):
-    """Extract dominant colors from an image using k-means clustering."""
+
     try:
         img = Image.open(image_file)
         img = img.convert('RGB')
@@ -61,11 +60,9 @@ def get_dominant_colors(image_file, num_colors=5):
         return []
 
 
+#Comparing similarity
 def compare_image_sets(hash_set1, hash_set2):
-    """
-    Compare multiple hashes (average, perceptual, difference)
-    and return overall similarity (0–100).
-    """
+
     try:
         scores = []
         for key in ['average_hash', 'perceptual_hash', 'difference_hash']:
@@ -79,3 +76,5 @@ def compare_image_sets(hash_set1, hash_set2):
     except Exception as e:
         print(f"[compare_image_sets] Error: {e}")
         return 0
+    
+

@@ -181,7 +181,7 @@ class AssetViewSet(viewsets.ModelViewSet):
         )
         asset = serializer.save(user=self.request.user)
         
-        # Hashing- If it's an image, calculate hash
+        # Hashing- IMG only
         if asset.file_type == 'IMG':
             try:
                 from .utils import calculate_image_hash, get_dominant_colors
@@ -371,32 +371,29 @@ class AssetViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
     def search_by_image(self, request):
-        """
-        Upload an image and find visually similar assets by hash.
-        """
         print("=== Image Search Request Received ===")
         print("User:", request.user)
         print("Files:", dict(request.FILES))
         
         if 'image' not in request.FILES:
-            print("❌ No image file in request")
+            print("No image file in request")
             return Response({'error': 'No image file provided'}, status=status.HTTP_400_BAD_REQUEST)
 
         uploaded_image = request.FILES['image']
         print(f"Uploaded image: {uploaded_image.name}, {uploaded_image.content_type}, {uploaded_image.size} bytes")
 
         if not uploaded_image.content_type.startswith('image/'):
-            print(f"❌ Not an image file: {uploaded_image.content_type}")
+            print(f"Not an image file: {uploaded_image.content_type}")
             return Response({'error': 'File must be an image'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             # Calculate hashes for uploaded image
-            print("🔍 Calculating image hashes...")
+            print("Calculating image hashes...")
             image_hashes = calculate_image_hash(uploaded_image)
-            print("✅ Hashes calculated:", image_hashes)
+            print("Hashes calculated:", image_hashes)
             
             if not image_hashes:
-                print("❌ Failed to calculate image hashes")
+                print("Failed to calculate image hashes")
                 return Response({'error': 'Failed to process image'}, status=status.HTTP_400_BAD_REQUEST)
 
             # Fetch image assets that have hashes calculated
@@ -408,7 +405,7 @@ class AssetViewSet(viewsets.ModelViewSet):
                 average_hash=''
             )
             
-            print(f"📊 Found {image_assets.count()} image assets with hashes")
+            print(f"Found {image_assets.count()} image assets with hashes")
 
             results = []
             for asset in image_assets:
@@ -453,7 +450,7 @@ class AssetViewSet(viewsets.ModelViewSet):
             })
             
         except Exception as e:
-            print(f"💥 Unexpected error in search_by_image: {str(e)}")
+            print(f"Unexpected error in search_by_image: {str(e)}")
             import traceback
             traceback.print_exc()
             return Response(
