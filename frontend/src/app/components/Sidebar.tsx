@@ -154,15 +154,6 @@ export default function Sidebar() {
               </Tooltip>
             </>
           )}
-
-          <Tooltip label="Settings" placement="right">
-            <IconButton
-              aria-label="Settings"
-              icon={<Settings />}
-              variant="ghost"
-              onClick={() => goTo("/settings")}
-            />
-          </Tooltip>
         </VStack>
 
         {/* Logout */}
