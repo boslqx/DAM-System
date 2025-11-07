@@ -2,20 +2,28 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from .models import Asset
 from .serializers import AssetSerializer
 from users.permissions import IsAdmin, IsEditorOrAdmin, IsViewerOrHigher
 from activitylog.models import ActivityLog  
 import json
-from django.db.models import Sum, Count
+from django.db.models import Sum, Count, Q
 from .utils import calculate_image_hash, compare_image_sets
 import io
 
 class AssetViewSet(viewsets.ModelViewSet):
     queryset = Asset.objects.all()
     serializer_class = AssetSerializer
-    parser_classes = [MultiPartParser, FormParser]  # Important for file uploads!
+    parser_classes = [MultiPartParser, FormParser, JSONParser]  # Important for file uploads!
+
+    def get_parsers(self):
+        """Use appropriate parser based on request method"""
+        if self.request.method in ['PATCH', 'PUT']:
+            # Use JSONParser for updates
+            return [JSONParser()]
+        # Use MultiPartParser/FormParser for file uploads (POST)
+        return [MultiPartParser(), FormParser()]
 
     def get_serializer_context(self):
         """Pass request to serializer for is_favorited check"""
@@ -61,9 +69,15 @@ class AssetViewSet(viewsets.ModelViewSet):
             )
         
         # Apply filters
-        keyword = params.get('keyword')
-        if keyword:
-            queryset = queryset.filter(name__icontains=keyword)
+        search = params.get('search')
+        if search:
+            # Search across multiple fields
+            queryset = queryset.filter(
+                Q(name__icontains=search) |
+                Q(description__icontains=search) |
+                Q(keywords__icontains=search) |
+                Q(tags__contains=[search])  # Search in tags array
+            )
 
         file_type = params.get('file_type')
         if file_type:
