@@ -16,30 +16,19 @@ export default function BabylonViewer({ modelUrl }: { modelUrl: string }) {
         const { ArcRotateCamera } = await import("@babylonjs/core/Cameras/arcRotateCamera");
         const { Vector3 } = await import("@babylonjs/core/Maths/math.vector");
         const { HemisphericLight } = await import("@babylonjs/core/Lights/hemisphericLight");
+        const { DirectionalLight } = await import("@babylonjs/core/Lights/directionalLight");
         const { SceneLoader } = await import("@babylonjs/core/Loading/sceneLoader");
-        const { CubeTexture } = await import("@babylonjs/core/Materials/Textures/cubeTexture");
-        const { EnvironmentHelper } = await import("@babylonjs/core/Helpers/environmentHelper");
+        const { Color3, Color4 } = await import("@babylonjs/core/Maths/math.color");
 
-        // ✅ Create engine and scene
-        const engine = new Engine(canvasRef.current, true);
+        // Create engine and scene
+        const engine = new Engine(canvasRef.current, true, {
+          preserveDrawingBuffer: true,
+          stencil: true,
+        });
         const scene = new Scene(engine);
 
-        // ✅ Add realistic environment and skybox
-        const envTexture = CubeTexture.CreateFromPrefilteredData(
-          "https://assets.babylonjs.com/environments/environmentSpecular.env",
-          scene
-        );
-        scene.environmentTexture = envTexture;
-
-        // ✅ Proper modern way to add a skybox in Babylon v8+
-        new EnvironmentHelper(
-          {
-            createSkybox: true,
-            skyboxSize: 1000,
-            environmentTexture: envTexture,
-          },
-          scene
-        );
+        // Set background color instead of skybox
+        scene.clearColor = new Color4(0.2, 0.2, 0.25, 1.0);
 
         // Camera setup
         const camera = new ArcRotateCamera(
@@ -53,10 +42,24 @@ export default function BabylonViewer({ modelUrl }: { modelUrl: string }) {
         camera.attachControl(canvasRef.current, true);
         camera.lowerRadiusLimit = 2;
         camera.upperRadiusLimit = 20;
+        camera.wheelPrecision = 50;
 
-        // Light
-        const light = new HemisphericLight("light", new Vector3(0, 1, 0), scene);
-        light.intensity = 0.7;
+        // Better lighting setup - no environment texture
+        const hemisphericLight = new HemisphericLight(
+          "hemisphericLight",
+          new Vector3(0, 1, 0),
+          scene
+        );
+        hemisphericLight.intensity = 0.7;
+        hemisphericLight.groundColor = new Color3(0.2, 0.2, 0.3);
+
+        const directionalLight = new DirectionalLight(
+          "directionalLight",
+          new Vector3(-1, -2, -1),
+          scene
+        );
+        directionalLight.position = new Vector3(20, 40, 20);
+        directionalLight.intensity = 0.5;
 
         // Load 3D model
         SceneLoader.ImportMesh(
@@ -69,6 +72,9 @@ export default function BabylonViewer({ modelUrl }: { modelUrl: string }) {
             if (meshes.length > 0) {
               const rootMesh = meshes[0];
               camera.setTarget(rootMesh.position);
+              
+              // Auto-frame the model
+              camera.setPosition(new Vector3(0, 2, -5));
             }
           },
           undefined,
@@ -95,7 +101,11 @@ export default function BabylonViewer({ modelUrl }: { modelUrl: string }) {
       }
     };
 
-    initViewer();
+    const cleanup = initViewer();
+    
+    return () => {
+      cleanup?.then(cleanupFn => cleanupFn?.());
+    };
   }, [modelUrl]);
 
   return (
