@@ -44,7 +44,6 @@ def calculate_image_hash(image_file):
 
 #Dominant colors
 def get_dominant_colors(image_file, num_colors=5):
-
     try:
         img = Image.open(image_file)
         img = img.convert('RGB')
@@ -54,7 +53,8 @@ def get_dominant_colors(image_file, num_colors=5):
         kmeans = KMeans(n_clusters=num_colors, random_state=42)
         kmeans.fit(pixels)
         colors = kmeans.cluster_centers_.astype(int)
-        return [tuple(color) for color in colors]
+
+        return [tuple(int(c) for c in color) for color in colors]
     except Exception as e:
         print(f"[get_dominant_colors] Error: {e}")
         return []
