@@ -95,7 +95,6 @@ export default function Dashboard() {
   // Filter states
   const [quickSearch, setQuickSearch] = useState("");
   const [selectedFileType, setSelectedFileType] = useState("");
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
 
   const [availableCategories, setAvailableCategories] = useState<string[]>([]);
   const [availableTags, setAvailableTags] = useState<string[]>([]);
@@ -142,7 +141,8 @@ export default function Dashboard() {
     }
   };
 
-  const fetchAssets = async () => {
+  // Fetch assets with proper filtering
+  const fetchAssetsWithFilters = async () => {
     const token = localStorage.getItem("token");
     if (!token) {
       router.push("/login");
@@ -152,13 +152,21 @@ export default function Dashboard() {
     try {
       setLoading(true);
 
+      // Build query parameters
       const params = new URLSearchParams();
-      if (quickSearch.trim()) params.append('search', quickSearch);
-      if (selectedFileType) params.append('file_type', selectedFileType);
-      if (selectedTags.length > 0) params.append('tags', selectedTags.join(','));
+      
+      // Only add parameters if they have values
+      if (quickSearch.trim()) {
+        params.append('search', quickSearch.trim());
+      }
+      if (selectedFileType) {
+        params.append('file_type', selectedFileType);
+      }
 
       const queryString = params.toString();
       const url = `http://127.0.0.1:8000/api/assets/${queryString ? `?${queryString}` : ''}`;
+
+      console.log('Fetching URL:', url); // Debug log
 
       const res = await fetch(url, {
         headers: {
@@ -193,33 +201,67 @@ export default function Dashboard() {
     }
   };
 
+  const fetchAssets = async () => {
+    await fetchAssetsWithFilters();
+  };
+
   useEffect(() => {
     fetchAssets();
     fetchMetadata();
   }, []);
 
+  // Debounced search effect
   useEffect(() => {
     const timer = setTimeout(() => {
-      fetchAssets();
+      fetchAssetsWithFilters();
     }, 500);
     return () => clearTimeout(timer);
-  }, [quickSearch, selectedFileType, selectedTags]);
+  }, [quickSearch, selectedFileType]);
 
   const handleUpdateAsset = async (assetData: any) => {
-    const token = localStorage.getItem("token");
-    const res = await fetch(`http://127.0.0.1:8000/api/assets/${assetData.id}/`, {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Token ${token}`,
-      },
-      body: JSON.stringify(assetData),
-    });
+    try {
+      const token = localStorage.getItem("token");
+      
+      // Ensure tags is always an array
+      const updateData = {
+        ...assetData,
+        tags: Array.isArray(assetData.tags) ? assetData.tags : []
+      };
 
-    if (!res.ok) throw new Error("Failed to update asset");
+      const res = await fetch(`http://127.0.0.1:8000/api/assets/${assetData.id}/`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Token ${token}`,
+        },
+        body: JSON.stringify(updateData),
+      });
 
-    fetchAssets();
-    fetchMetadata();
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || "Failed to update asset");
+      }
+
+      toast({
+        title: "Asset updated successfully",
+        status: "success",
+        duration: 3000,
+        isClosable: true,
+      });
+
+      fetchAssets();
+      fetchMetadata();
+      setEditingAsset(null);
+    } catch (error: any) {
+      console.error("Update error:", error);
+      toast({
+        title: "Error updating asset",
+        description: error.message,
+        status: "error",
+        duration: 4000,
+        isClosable: true,
+      });
+    }
   };
 
   const handleDeleteAsset = async (assetId: number) => {
@@ -290,14 +332,10 @@ export default function Dashboard() {
     return `http://127.0.0.1:8000${fileUrl}`;
   };
 
-  const removeTag = (tag: string) => {
-    setSelectedTags(selectedTags.filter(t => t !== tag));
-  };
-
   const clearAllFilters = () => {
     setQuickSearch("");
     setSelectedFileType("");
-    setSelectedTags([]);
+    fetchAssetsWithFilters(); // Refresh immediately after clearing
   };
 
   const formatFileSize = (bytes: number): string => {
@@ -330,9 +368,16 @@ export default function Dashboard() {
     <Flex>
       <Sidebar />
       <Box flex="1" p={8} bg="brand.50" minH="100vh" ml={{ base: "0", md: "60px" }} transition="margin 0.3s ease">
-        <Heading mb={6} color="gray.700">
-          Asset Dashboard
-        </Heading>
+        {/* Logo Header */}
+        <Flex justify="center" mb={6}>
+          <Image 
+            src="http://127.0.0.1:8000/media/logo/Assetflow_transparent.png" 
+            alt="AssetFlow Logo" 
+            h="150px"
+            w="150px"
+            objectFit="contain"
+          />
+        </Flex>
         
         {/* Enhanced Search and Filter Bar */}
         <Box mb={6}>
