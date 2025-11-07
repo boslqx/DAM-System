@@ -89,55 +89,46 @@ class AssetViewSet(viewsets.ModelViewSet):
             print("Files:", request.FILES)
             print("Raw Data:", dict(request.data))
             
-            # Make a mutable copy of the data
-            data = request.data.copy()
+            # DON'T copy for large files - work with request.data directly
+            data = request.data
             
             # Handle tags sent as tags[] array from FormData
+            tags_to_save = []
             if 'tags[]' in request.data:
-                # getlist returns all values for keys ending with []
                 tags_list = request.data.getlist('tags[]')
-                # Ensure the mutable QueryDict stores a proper multi-value list for 'tags'
-                if hasattr(data, 'setlist'):
-                    data.setlist('tags', tags_list)
-                else:
-                    data['tags'] = list(tags_list)
-                # Remove the raw tags[] entries to avoid confusion downstream
-                try:
-                    del data['tags[]']
-                except Exception:
-                    pass
+                tags_to_save = list(tags_list)
                 print("Tags extracted from tags[]:", tags_list)
-                print("Tags type:", type(tags_list))
-            # Handle regular tags field
             elif 'tags' in data:
                 tags_value = data.get('tags')
-                print("Tags value received:", tags_value, "Type:", type(tags_value))
-                
-                if isinstance(tags_value, str):
-                    if not tags_value.strip():
-                        data['tags'] = []
-                    else:
-                        try:
-                            parsed = json.loads(tags_value)
-                            if isinstance(parsed, list):
-                                data['tags'] = parsed
-                            else:
-                                data['tags'] = []
-                        except (json.JSONDecodeError, ValueError):
-                            data['tags'] = [tag.strip() for tag in tags_value.split(',') if tag.strip()]
+                if isinstance(tags_value, str) and tags_value.strip():
+                    try:
+                        parsed = json.loads(tags_value)
+                        if isinstance(parsed, list):
+                            tags_to_save = parsed
+                    except (json.JSONDecodeError, ValueError):
+                        tags_to_save = [tag.strip() for tag in tags_value.split(',') if tag.strip()]
                 elif isinstance(tags_value, list):
-                    # Ensure all list elements are strings
-                    data['tags'] = [str(tag) for tag in tags_value]
-                else:
-                    data['tags'] = []
-            else:
-                data['tags'] = []
-                print("No tags provided")
+                    tags_to_save = [str(tag) for tag in tags_value]
             
-            print("Final tags to be saved:", data.get('tags'))
-            print("Final tags type:", type(data.get('tags')))
+            print("Final tags to be saved:", tags_to_save)
             
-            serializer = self.get_serializer(data=data, context={'request': request})
+            # Build the data dict for serializer
+            serializer_data = {
+                'name': data.get('name'),
+                'description': data.get('description', ''),
+                'category': data.get('category', ''),
+                'file_type': data.get('file_type'),
+                'file_size': data.get('file_size'),
+                'keywords': data.get('keywords', ''),
+                'is_public': data.get('is_public', True),
+                'tags': tags_to_save,
+            }
+            
+            # Add file if present
+            if 'file' in request.FILES:
+                serializer_data['file'] = request.FILES['file']
+            
+            serializer = self.get_serializer(data=serializer_data, context={'request': request})
             
             if not serializer.is_valid():
                 print("❌ Validation errors:", serializer.errors)
