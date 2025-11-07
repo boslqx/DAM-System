@@ -8,9 +8,11 @@ import { StarIcon } from "@chakra-ui/icons";
 interface FavoriteButtonProps {
   assetId: number;
   isFavorited?: boolean;
-  onToggle?: () => void;
+  onToggle: () => void;
   size?: "sm" | "md" | "lg";
   position?: "absolute" | "relative";
+  top?: string;
+  right?: string;
 }
 
 const FavoriteButton = ({
@@ -18,10 +20,11 @@ const FavoriteButton = ({
   isFavorited = false,
   onToggle,
   size = "md",
-  position = "absolute"
+  position = "absolute",
+  top = "2",
+  right = "2"
 }: FavoriteButtonProps) => {
   const [isLoading, setIsLoading] = useState(false);
-  const [localIsFavorited, setLocalIsFavorited] = useState(isFavorited);
   const toast = useToast();
 
   const handleToggleFavorite = async () => {
@@ -31,7 +34,7 @@ const FavoriteButton = ({
 
     try {
       const token = localStorage.getItem("token");
-      const action = localIsFavorited ? 'unfavorite' : 'favorite';
+      const action = isFavorited ? 'unfavorite' : 'favorite';
 
       const response = await fetch(`http://127.0.0.1:8000/api/assets/${assetId}/${action}/`, {
         method: 'POST',
@@ -42,16 +45,11 @@ const FavoriteButton = ({
       });
 
       if (response.ok) {
-        // Update local state
-        setLocalIsFavorited(!localIsFavorited);
-
-        // Notify parent component
-        if (onToggle) {
-          onToggle();
-        }
+        // Call parent's onToggle to refresh the data
+        onToggle();
 
         toast({
-          title: localIsFavorited ? "Removed from favorites" : "Added to favorites",
+          title: isFavorited ? "Removed from favorites" : "Added to favorites",
           status: "success",
           duration: 2000,
           isClosable: true,
@@ -74,16 +72,16 @@ const FavoriteButton = ({
 
   return (
     <Tooltip
-      label={localIsFavorited ? "Remove from favorites" : "Add to favorites"}
+      label={isFavorited ? "Remove from favorites" : "Add to favorites"}
       placement="top"
     >
       <IconButton
-        aria-label={localIsFavorited ? "Remove from favorites" : "Add to favorites"}
+        aria-label={isFavorited ? "Remove from favorites" : "Add to favorites"}
         icon={
           <StarIcon
-            color={localIsFavorited ? "yellow.400" : "white"}
-            fill={localIsFavorited ? "yellow.400" : "none"}
-            stroke={localIsFavorited ? "yellow.400" : "white"}
+            color={isFavorited ? "yellow.400" : "white"}
+            fill={isFavorited ? "yellow.400" : "none"}
+            stroke={isFavorited ? "yellow.400" : "white"}
             strokeWidth="2px"
           />
         }
@@ -96,8 +94,8 @@ const FavoriteButton = ({
         }}
         isLoading={isLoading}
         position={position}
-        top="2"
-        right="2"
+        top={top}
+        right={right}
         bg="rgba(0, 0, 0, 0.4)"
         _hover={{
           bg: "rgba(0, 0, 0, 0.6)",
@@ -106,6 +104,7 @@ const FavoriteButton = ({
         transition="all 0.2s"
         zIndex="10"
       />
+
     </Tooltip>
   );
 };

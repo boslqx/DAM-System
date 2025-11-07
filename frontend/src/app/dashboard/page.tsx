@@ -775,25 +775,24 @@ export default function Dashboard() {
                   }>
                     {selectedAsset?.file_type}
                   </Badge>
-                  <Tooltip label={selectedAsset?.is_favorited ? "Remove from favorites" : "Add to favorites"}>
-                    <IconButton
-                      aria-label="Favorite"
-                      icon={<StarIcon />}
-                      size="sm"
-                      variant="ghost"
-                      color={selectedAsset?.is_favorited ? "yellow.500" : "gray.400"}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (selectedAsset) {
-                          // Trigger favorite toggle
-                          const favoriteBtn = document.querySelector(`[data-asset-id="${selectedAsset.id}"]`);
-                          if (favoriteBtn) {
-                            (favoriteBtn as HTMLElement).click();
-                          }
+                  {selectedAsset && (
+                    <FavoriteButton
+                      assetId={selectedAsset.id}
+                      isFavorited={selectedAsset.is_favorited}
+                      onToggle={() => {
+                        fetchAssets(); // Refresh all assets
+                        // Also update the selected asset in the modal
+                        const updatedAsset = assets.find(a => a.id === selectedAsset.id);
+                        if (updatedAsset) {
+                          setSelectedAsset(updatedAsset);
                         }
                       }}
+                      size="sm"
+                      position="relative"
+                      top="0"
+                      right="0"
                     />
-                  </Tooltip>
+                  )}
                 </HStack>
                 <HStack spacing={2}>
                   <Tooltip label="Download">
@@ -1009,17 +1008,6 @@ export default function Dashboard() {
             </ModalBody>
           </ModalContent>
         </Modal>
-
-        {/* Hidden FavoriteButton for functionality */}
-        {selectedAsset && (
-          <FavoriteButton
-            assetId={selectedAsset.id}
-            isFavorited={selectedAsset.is_favorited}
-            onToggle={fetchAssets}
-            style={{ display: 'none' }}
-            data-asset-id={selectedAsset.id}
-          />
-        )}
 
         <ImageSearchModal
           isOpen={isImageSearchOpen}
