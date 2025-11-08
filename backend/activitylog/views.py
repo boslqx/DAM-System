@@ -2,7 +2,7 @@ from rest_framework import viewsets, filters
 from django_filters.rest_framework import DjangoFilterBackend
 from .models import ActivityLog
 from .serializers import ActivityLogSerializer
-from users.permissions import IsAdmin  # Import from your users app
+from users.permissions import IsAdmin
 from django.utils import timezone
 from datetime import datetime
 

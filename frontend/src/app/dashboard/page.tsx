@@ -407,7 +407,7 @@ export default function Dashboard() {
               </InputGroup>
             </Box>
 
-            {/* File Type Filter ONLY - Categories Removed */}
+            {/* Filter */}
             <Select
               placeholder="All Types"
               value={selectedFileType}
@@ -480,7 +480,7 @@ export default function Dashboard() {
             </Button>
           </Flex>
 
-          {/* Active Filters Display - Updated to remove categories */}
+          {/* Active Filters Display */}
           {(selectedFileType || quickSearch) && (
             <Flex gap={2} align="center" flexWrap="wrap">
               <Text fontSize="sm" color="gray.600" fontWeight="medium">Active Filters:</Text>

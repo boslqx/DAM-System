@@ -9,7 +9,7 @@ class AssetSerializer(serializers.ModelSerializer):
         required=False,
         allow_empty=True,
         default=list,
-        allow_null=True  # ADD THIS
+        allow_null=True
     )
     is_favorited = serializers.SerializerMethodField()
     favorites_count = serializers.SerializerMethodField()

@@ -74,7 +74,7 @@ export default function ManageUserPage() {
   const currentUsers = users.slice(indexOfFirstUser, indexOfLastUser);
   const totalPages = Math.ceil(users.length / usersPerPage);
 
-  // 🔹 Safe token retrieval
+  // Safe token retrieval
   const getToken = (): string | null => {
     if (typeof window !== "undefined") {
       return localStorage.getItem("token");
@@ -82,7 +82,7 @@ export default function ManageUserPage() {
     return null;
   };
 
-  // 🔹 Enhanced auth check
+  // Enhanced auth check
   useEffect(() => {
     const token = getToken();
     const storedRole = localStorage.getItem("role");
@@ -92,7 +92,7 @@ export default function ManageUserPage() {
       return;
     }
     
-    // Optional: Check if user has admin privileges
+    // Check if user has admin privileges
     if (storedRole !== 'Admin') {
       toast({
         title: "Access Denied",
@@ -105,7 +105,7 @@ export default function ManageUserPage() {
     }
   }, [router, toast]);
 
-  // 🔹 Enhanced fetch users with abort controller
+  // Enhanced fetch users with abort controller
   const fetchUsers = async () => {
     try {
       setLoading(true);
@@ -150,7 +150,7 @@ export default function ManageUserPage() {
     fetchUsers();
   }, []);
 
-  // 🔹 Enhanced role update with loading state
+  // Enhanced role update with loading state
   const handleRoleChange = async (userId: number, newRole: string) => {
     try {
       setUpdatingUserId(userId);
@@ -208,7 +208,7 @@ export default function ManageUserPage() {
     }
   };
 
-  // 🔹 Enhanced delete with confirmation modal simulation
+  // Enhanced delete with confirmation modal simulation
   const handleDelete = async (userId: number) => {
     if (!confirm("Are you sure you want to delete this user? This action cannot be undone.")) return;
 
@@ -263,7 +263,7 @@ export default function ManageUserPage() {
     }
   };
 
-  // 🔹 Create new user
+  // Create new user
   const handleCreateUser = async () => {
     try {
       setCreatingUser(true);
@@ -314,7 +314,7 @@ export default function ManageUserPage() {
     }
   };
 
-  // 🔹 Search/filter users
+  // Search/filter users
   const handleSearch = (query: string) => {
     if (!query.trim()) {
       setUsers(allUsers); // Reset to all users if search is empty
@@ -332,7 +332,7 @@ export default function ManageUserPage() {
     setCurrentPage(1); // Reset to first page
   };
 
-  // 🔹 Role color mapping
+  // Role color mapping
   const getRoleColor = (role: User['role']) => {
     switch (role) {
       case 'Admin': return 'red';
@@ -355,7 +355,7 @@ export default function ManageUserPage() {
     setCurrentPage(Math.max(1, Math.min(page, totalPages)));
   };
 
-  // 🔹 Enhanced loading state
+  // Enhanced loading state
   if (loading && users.length === 0) {
     return (
       <Flex justify="center" align="center" minH="100vh" direction="column" gap={4}>

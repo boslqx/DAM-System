@@ -15,7 +15,7 @@ import io
 class AssetViewSet(viewsets.ModelViewSet):
     queryset = Asset.objects.all()
     serializer_class = AssetSerializer
-    parser_classes = [MultiPartParser, FormParser, JSONParser]  # Important for file uploads!
+    parser_classes = [MultiPartParser, FormParser, JSONParser]  # file uplaods reader
 
     def get_parsers(self):
         """Use appropriate parser based on request method"""
@@ -103,7 +103,6 @@ class AssetViewSet(viewsets.ModelViewSet):
             print("Files:", request.FILES)
             print("Raw Data:", dict(request.data))
             
-            # DON'T copy for large files - work with request.data directly
             data = request.data
             
             # Handle tags sent as tags[] array from FormData

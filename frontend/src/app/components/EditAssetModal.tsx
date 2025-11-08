@@ -25,7 +25,7 @@ import {
   InputRightElement,
   useToast,
 } from "@chakra-ui/react";
-import { useState, useEffect } from "react"; // Fixed: Added useEffect import
+import { useState, useEffect } from "react";
 
 interface Asset {
   id: number;
@@ -65,7 +65,7 @@ export default function EditAssetModal({
   const [loading, setLoading] = useState(false);
   const toast = useToast();
 
-  // FIXED: Changed useState to useEffect to reset form when asset changes
+  // asset changes
   useEffect(() => {
     if (asset) {
       setFormData({
