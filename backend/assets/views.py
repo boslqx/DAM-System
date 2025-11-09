@@ -11,6 +11,9 @@ import json
 from django.db.models import Sum, Count, Q
 from .utils import calculate_image_hash, compare_image_sets
 import io
+import os
+import mimetypes
+from django.http import FileResponse
 
 class AssetViewSet(viewsets.ModelViewSet):
     queryset = Asset.objects.all()
@@ -411,3 +414,78 @@ class AssetViewSet(viewsets.ModelViewSet):
 
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+    @action(detail=True, methods=['get'], permission_classes=[IsAuthenticated])
+    def download(self, request, pk=None):
+        """
+        Custom download endpoint that forces download for all file types
+        GET /api/assets/{id}/download/
+        """
+        try:
+            asset = self.get_object()
+            
+            # Check if file exists
+            if not asset.file:
+                return Response(
+                    {'error': 'File not found'}, 
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            
+            file_path = asset.file.path
+            
+            if not os.path.exists(file_path):
+                return Response(
+                    {'error': 'File not found on server'}, 
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            
+            # Log download action
+            self.log_action(
+                user=request.user,
+                action_type="view",
+                description=f"Downloaded asset '{asset.name}' ({asset.file_type}) [id={asset.id}]",
+                ip_address=request.META.get('REMOTE_ADDR'),
+            )
+            
+            # Get original filename to extract extension
+            original_filename = os.path.basename(asset.file.name)
+            
+            # if adsset.name has no extension, append original file's extension
+            if not os.path.splitext(asset.name)[1]: 
+                # Get extension from original file
+                _, ext = os.path.splitext(original_filename)
+                download_filename = f"{asset.name}{ext}"
+            else:
+                # asset.name already has extension
+                download_filename = asset.name
+            
+            # Open file
+            file_handle = open(file_path, 'rb')
+            
+            # Determine content type
+            content_type, _ = mimetypes.guess_type(file_path)
+            if not content_type:
+                content_type = 'application/octet-stream'
+            
+            # Create response
+            response = FileResponse(file_handle, content_type=content_type)
+            
+            # use file name for download
+            response['Content-Disposition'] = f'attachment; filename="{download_filename}"'
+            response['Content-Length'] = asset.file_size
+            
+            return response
+            
+        except Asset.DoesNotExist:
+            return Response(
+                {'error': 'Asset not found'}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            print(f"Download error: {e}")
+            import traceback
+            traceback.print_exc()
+            return Response(
+                {'error': str(e)}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

@@ -264,6 +264,72 @@ export default function Dashboard() {
     }
   };
 
+  const handleDownload = async (asset: Asset, event?: React.MouseEvent) => {
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+    
+    try {
+      const token = localStorage.getItem("token");
+      
+      // Show loading toast
+      toast({
+        title: "Downloading...",
+        description: `Preparing ${asset.name}`,
+        status: "info",
+        duration: 2000,
+      });
+      
+      // Call custom download endpoint
+      const response = await fetch(
+        `http://127.0.0.1:8000/api/assets/${asset.id}/download/`,
+        {
+          headers: {
+            Authorization: `Token ${token}`,
+          },
+        }
+      );
+      
+      if (!response.ok) {
+        throw new Error('Download failed');
+      }
+      
+      // Get file as blob
+      const blob = await response.blob();
+      
+      // Create temporary download link
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = asset.name;  // Use original filename
+      document.body.appendChild(a);
+      a.click();
+      
+      // Cleanup
+      setTimeout(() => {
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+      }, 100);
+      
+      toast({
+        title: "Download complete!",
+        description: `${asset.name} has been downloaded`,
+        status: "success",
+        duration: 3000,
+      });
+      
+    } catch (error) {
+      console.error('Download error:', error);
+      toast({
+        title: "Download failed",
+        description: "Please try again",
+        status: "error",
+        duration: 3000,
+      });
+    }
+  };
+
   const handleDeleteAsset = async (assetId: number) => {
     if (!confirm("Are you sure you want to delete this asset?")) return;
 
@@ -636,10 +702,10 @@ export default function Dashboard() {
                             size="sm"
                             variant="ghost"
                             colorScheme="blue"
-                            as="a"
-                            href={asset.download_url || getFullFileUrl(asset.file)}
-                            download
-                            onClick={(e) => e.stopPropagation()}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDownload(asset, e);
+                            }}
                           />
                         </Tooltip>
 
@@ -734,8 +800,10 @@ export default function Dashboard() {
                             size="sm"
                             variant="ghost"
                             as="a"
-                            href={getFullFileUrl(asset.file)}
-                            download
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDownload(asset, e);
+                            }}
                           />
                         </Tooltip>
                         <FavoriteButton
@@ -801,10 +869,10 @@ export default function Dashboard() {
                       icon={<DownloadIcon />}
                       size="sm"
                       variant="ghost"
-                      as="a"
-                      href={selectedAsset ? getFullFileUrl(selectedAsset.file) : '#'}
-                      download
-                      onClick={(e) => e.stopPropagation()}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (selectedAsset) handleDownload(selectedAsset);
+                      }}
                     />
                   </Tooltip>
                   <Tooltip label="Open in new tab">
