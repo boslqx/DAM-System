@@ -68,7 +68,7 @@ export default function BabylonViewer({ modelUrl }: { modelUrl: string }) {
           modelUrl,
           scene,
           (meshes) => {
-            console.log("✅ Model loaded:", meshes.length, "meshes");
+            console.log("Model loaded:", meshes.length, "meshes");
             if (meshes.length > 0) {
               const rootMesh = meshes[0];
               camera.setTarget(rootMesh.position);
@@ -79,7 +79,7 @@ export default function BabylonViewer({ modelUrl }: { modelUrl: string }) {
           },
           undefined,
           (scene, message) => {
-            console.error("❌ Error loading model:", message);
+            console.error("Error loading model:", message);
           }
         );
 
