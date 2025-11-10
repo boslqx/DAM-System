@@ -10,7 +10,7 @@ export default function BabylonViewer({ modelUrl }: { modelUrl: string }) {
 
     const initViewer = async () => {
       try {
-        // Dynamic imports
+        //Imports
         const { Engine } = await import("@babylonjs/core/Engines/engine");
         const { Scene } = await import("@babylonjs/core/scene");
         const { ArcRotateCamera } = await import("@babylonjs/core/Cameras/arcRotateCamera");
@@ -20,17 +20,17 @@ export default function BabylonViewer({ modelUrl }: { modelUrl: string }) {
         const { SceneLoader } = await import("@babylonjs/core/Loading/sceneLoader");
         const { Color3, Color4 } = await import("@babylonjs/core/Maths/math.color");
 
-        // Create engine and scene
+        //Engine & Scene 
         const engine = new Engine(canvasRef.current, true, {
           preserveDrawingBuffer: true,
           stencil: true,
         });
         const scene = new Scene(engine);
 
-        // Set background color instead of skybox
+        //bg colour
         scene.clearColor = new Color4(0.2, 0.2, 0.25, 1.0);
 
-        // Camera setup
+        //Camera setup
         const camera = new ArcRotateCamera(
           "camera",
           -Math.PI / 2,
@@ -44,7 +44,7 @@ export default function BabylonViewer({ modelUrl }: { modelUrl: string }) {
         camera.upperRadiusLimit = 20;
         camera.wheelPrecision = 50;
 
-        // Better lighting setup - no environment texture
+        //Lighting
         const hemisphericLight = new HemisphericLight(
           "hemisphericLight",
           new Vector3(0, 1, 0),
@@ -61,7 +61,7 @@ export default function BabylonViewer({ modelUrl }: { modelUrl: string }) {
         directionalLight.position = new Vector3(20, 40, 20);
         directionalLight.intensity = 0.5;
 
-        // Load 3D model
+        //Load 3D model
         SceneLoader.ImportMesh(
           "",
           "",
@@ -73,7 +73,6 @@ export default function BabylonViewer({ modelUrl }: { modelUrl: string }) {
               const rootMesh = meshes[0];
               camera.setTarget(rootMesh.position);
               
-              // Auto-frame the model
               camera.setPosition(new Vector3(0, 2, -5));
             }
           },
@@ -83,11 +82,11 @@ export default function BabylonViewer({ modelUrl }: { modelUrl: string }) {
           }
         );
 
-        // Resize handler
+        //Resize
         const handleResize = () => engine.resize();
         window.addEventListener("resize", handleResize);
 
-        // Render loop
+        //Render
         engine.runRenderLoop(() => scene.render());
 
         // Cleanup
